@@ -12,6 +12,7 @@ import {
   Orbit,
   Redo2,
   Scan,
+  NotebookText,
   Trash2,
   Undo2,
   type LucideIcon,
@@ -22,6 +23,7 @@ import { boundsOf } from "../model/geometry";
 import type { LayoutMode } from "../model/types";
 import { visibleIds } from "../model/tree";
 import { useMindMap } from "../store/mindmap-store";
+import { useNoteUi } from "../store/note-ui-store";
 
 const spring = { type: "spring", stiffness: 500, damping: 22 } as const;
 
@@ -135,6 +137,7 @@ export function Dock() {
       <div className="mm-dock-group" role="group" aria-label="Crear y borrar">
         <DockButton icon={CornerDownRight} label="Agregar idea hija" text="Hija" keys="Tab" disabled={!selectedId && "Seleccioná una idea primero"} onClick={() => selectedId && s().addChild(selectedId)} />
         <DockButton icon={ListPlus} label="Agregar idea hermana" text="Hermana" keys="Enter" disabled={!selectedId && "Seleccioná una idea primero"} onClick={() => selectedId && s().addSibling(selectedId)} />
+        <DockButton icon={NotebookText} label="Nota de la idea" text="Nota" keys="Ctrl Enter" disabled={!selectedId && "Seleccioná una idea primero"} onClick={() => selectedId && useNoteUi.getState().pin(selectedId)} />
         <DockButton icon={Trash2} label="Borrar idea y su rama" keys="Supr" danger disabled={!selectedId ? "Seleccioná una idea primero" : selectedId === rootId && "La idea central no se borra"} onClick={() => selectedId && s().deleteNode(selectedId)} />
       </div>
 

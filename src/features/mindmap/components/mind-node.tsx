@@ -48,6 +48,14 @@ function straddleStyle(dir: Direction): CSSProperties {
 
 const spring = { type: "spring", stiffness: 520, damping: 26 } as const;
 
+/** Puntos de conexión en las 4 esquinas (los lados ya tienen los botones de agregar y plegar) */
+const CONNECTORS: { id: string; position: Position; style: CSSProperties }[] = [
+  { id: "c-tl", position: Position.Top, style: { left: 0, top: 0 } },
+  { id: "c-tr", position: Position.Top, style: { left: "100%", top: 0 } },
+  { id: "c-bl", position: Position.Bottom, style: { left: 0, top: "auto", bottom: 0 } },
+  { id: "c-br", position: Position.Bottom, style: { left: "100%", top: "auto", bottom: 0 } },
+];
+
 function QuickAdd({ dir, gap, label, onClick, kind }: { dir: Direction; gap: number; label: string; onClick: () => void; kind: "child" | "sibling" }) {
   const Icon = ARROW[dir];
   return (
@@ -185,6 +193,7 @@ function MindNodeImpl({ id }: NodeProps) {
   const s = useMindMap.getState;
   const multiline = size.lines > 1;
   const hasNote = !!node.note?.trim();
+  const showConnectors = (hover || selected) && !editing && !dragging;
 
   const tier = isRoot ? "mm-node--root" : depth === 1 ? "mm-node--branch" : "mm-node--leaf";
 
@@ -203,6 +212,19 @@ function MindNodeImpl({ id }: NodeProps) {
     >
       <Handle type="target" position={Position.Left} className="mm-handle" isConnectable={false} />
       <Handle type="source" position={Position.Right} className="mm-handle" isConnectable={false} />
+      {/* Puntos de conexión (esquinas): se arrastran hasta otra idea para crear una flecha de relación */}
+      {CONNECTORS.map((c) => (
+        <Handle
+          key={c.id}
+          id={c.id}
+          type="source"
+          position={c.position}
+          className={`mm-conn ${showConnectors ? "is-shown" : ""}`}
+          style={c.style}
+          title="Arrastrá hasta otra idea para relacionarlas"
+          aria-label="Punto de conexión: arrastrá hasta otra idea para crear una relación"
+        />
+      ))}
 
       <motion.div
         className={`mm-node ${tier} ${selected ? "is-selected" : ""} ${editing ? "is-editing" : ""}`}
@@ -233,14 +255,14 @@ function MindNodeImpl({ id }: NodeProps) {
         )}
       </motion.div>
 
-      {/* Marca de nota: la idea tiene apuntes. Sin nota, aparece al pasar el cursor
-          para poder escribir una con el mouse. Clic = abrirla fijada */}
-      {(hasNote || showControls) && !editing && (
+      {/* Marca de nota: la idea tiene apuntes. Clic = abrirla fijada.
+          Para escribir una nota nueva: botón "Nota" de la barra o Ctrl Enter. */}
+      {hasNote && !editing && (
         <button
           type="button"
-          className={`mm-note-badge nodrag nopan ${hasNote ? "" : "mm-note-badge--add"}`}
-          aria-label={hasNote ? "Abrir la nota de esta idea" : "Escribir una nota para esta idea"}
-          title={hasNote ? "Abrir nota (Ctrl Enter)" : "Agregar nota (Ctrl Enter)"}
+          className="mm-note-badge nodrag nopan"
+          aria-label="Abrir la nota de esta idea"
+          title="Abrir nota (Ctrl Enter)"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -248,7 +270,7 @@ function MindNodeImpl({ id }: NodeProps) {
             useNoteUi.getState().pin(id);
           }}
         >
-          <NotebookText size={10} strokeWidth={2.4} />
+          <NotebookText size={8} strokeWidth={2.6} />
         </button>
       )}
 

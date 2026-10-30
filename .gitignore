@@ -47,3 +47,6 @@ data/
 # herramientas locales (no van al repo)
 .claude/
 .impeccable/
+
+# scripts de ayuda para subir cambios (no van al repo)
+subir-*.cmd

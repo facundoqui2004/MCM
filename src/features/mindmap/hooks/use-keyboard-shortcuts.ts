@@ -32,6 +32,25 @@ export function useKeyboardShortcuts({ onSave, onFind }: { onSave: () => void; o
       const mod = e.metaKey || e.ctrlKey;
       const sel = s.selectedId;
 
+      // Con una flecha de relación seleccionada: Supr la borra, F2/Enter la nombra, Esc la suelta
+      const rel = s.selectedRelationId;
+      if (rel && !mod && !e.altKey && !isControl(e.target)) {
+        if (e.key === "Delete" || e.key === "Backspace") {
+          e.preventDefault();
+          s.deleteRelation(rel);
+          return;
+        }
+        if (e.key === "F2" || e.key === "Enter") {
+          e.preventDefault();
+          s.startRelationEdit(rel);
+          return;
+        }
+        if (e.key === "Escape") {
+          s.selectRelation(null);
+          return;
+        }
+      }
+
       if (mod && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) s.redo();

@@ -40,6 +40,17 @@ export interface MindNodeModel {
   y: number;
 }
 
+/**
+ * Flecha de relación libre entre dos ideas cualesquiera (además del árbol).
+ * Va de `from` a `to` y puede tener un nombre que se muestra sobre la flecha.
+ */
+export interface Relation {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+}
+
 export interface MindMapDoc {
   schemaVersion: 1;
   rootId: string;
@@ -47,6 +58,8 @@ export interface MindMapDoc {
   /** true: cada cambio estructural reordena todo. false: modo libre (hubo drag manual) */
   autoLayout: boolean;
   nodes: Record<string, MindNodeModel>;
+  /** Relaciones libres. Los mapas viejos no las tienen */
+  relations?: Relation[];
 }
 
 export interface MindMapSummary {

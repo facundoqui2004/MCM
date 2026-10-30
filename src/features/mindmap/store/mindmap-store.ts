@@ -1,5 +1,6 @@
 "use client";
 
+import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { createNode } from "../model/factory";
@@ -7,7 +8,7 @@ import { applyPositions, computeLayout } from "../model/layout";
 import { measureNode } from "../model/measure";
 import { BRANCH_COUNT } from "../model/palette";
 import { depthOf, descendantsOf, visibleChildren } from "../model/tree";
-import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, Side, XY } from "../model/types";
+import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, Relation, Side, XY } from "../model/types";
 
 type Nodes = Record<string, MindNodeModel>;
 
@@ -16,6 +17,7 @@ interface Snapshot {
   rootId: string;
   layoutMode: LayoutMode;
   autoLayout: boolean;
+  relations: Relation[];
 }
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error" | "conflict";
@@ -31,6 +33,10 @@ export interface MindMapState extends Snapshot {
   /** Texto en edición (no persistido): el nodo se autoajusta leyendo esto */
   editDraft: string | null;
   dragging: boolean;
+  /** Flecha de relación seleccionada (excluye a selectedId: o una idea o una flecha) */
+  selectedRelationId: string | null;
+  /** Flecha cuyo nombre se está escribiendo */
+  editingRelationId: string | null;
   /** Se incrementa en cada cambio persistible: el autosave escucha esto */
   revision: number;
   /** Se incrementa cuando cargan las webfonts y cambian las medidas */
@@ -73,6 +79,15 @@ export interface MindMapState extends Snapshot {
   notify: (text: string) => void;
   dismissNotice: () => void;
 
+  /** Crea una flecha de relación (si ya existe entre esas dos ideas, la selecciona) */
+  addRelation: (from: string, to: string) => string | null;
+  selectRelation: (id: string | null) => void;
+  startRelationEdit: (id: string) => void;
+  /** Confirma el nombre de la flecha; null = cancelar */
+  commitRelationLabel: (id: string, label: string | null) => void;
+  reverseRelation: (id: string) => void;
+  deleteRelation: (id: string) => void;
+
   beginDrag: () => void;
   dragTo: (id: string, position: XY) => void;
   endDrag: () => void;
@@ -93,7 +108,12 @@ const snap = (s: Snapshot): Snapshot => ({
   rootId: s.rootId,
   layoutMode: s.layoutMode,
   autoLayout: s.autoLayout,
+  relations: s.relations,
 });
+
+/** Saca las relaciones que quedaron apuntando a ideas borradas */
+const liveRelations = (relations: Relation[], nodes: Nodes) =>
+  relations.filter((r) => nodes[r.from] && nodes[r.to]);
 
 const relaid = (s: Snapshot, nodes: Nodes = s.nodes): Nodes =>
   applyPositions(nodes, computeLayout(nodes, s.rootId, s.layoutMode));
@@ -166,6 +186,9 @@ export const useMindMap = create<MindMapState>()(
       rootId: "",
       layoutMode: "map",
       autoLayout: true,
+      relations: [],
+      selectedRelationId: null,
+      editingRelationId: null,
       selectedId: null,
       editingId: null,
       editSeed: null,
@@ -188,6 +211,9 @@ export const useMindMap = create<MindMapState>()(
           rootId: doc.rootId,
           layoutMode: doc.layoutMode,
           autoLayout: doc.autoLayout,
+          relations: liveRelations(doc.relations ?? [], doc.nodes),
+          selectedRelationId: null,
+          editingRelationId: null,
           selectedId: doc.rootId,
           // Un mapa que todavía es sólo la idea central abre listo para escribir el tema
           editingId: Object.keys(doc.nodes).length === 1 ? doc.rootId : null,
@@ -202,17 +228,24 @@ export const useMindMap = create<MindMapState>()(
 
       toDoc: () => {
         const s = get();
-        return { schemaVersion: 1, rootId: s.rootId, layoutMode: s.layoutMode, autoLayout: s.autoLayout, nodes: s.nodes };
+        return {
+          schemaVersion: 1,
+          rootId: s.rootId,
+          layoutMode: s.layoutMode,
+          autoLayout: s.autoLayout,
+          nodes: s.nodes,
+          ...(s.relations.length ? { relations: s.relations } : null),
+        };
       },
 
       setTitle: (title) => commit({ title }, { history: false }),
       setSaveStatus: (saveStatus, version) => set(version ? { saveStatus, version } : { saveStatus }),
 
-      select: (id) => set({ selectedId: id }),
+      select: (id) => set({ selectedId: id, selectedRelationId: null, editingRelationId: null }),
 
       startEdit: (id, seed) => {
         const n = get().nodes[id];
-        set({ selectedId: id, editingId: id, editSeed: seed ?? null, editDraft: seed ?? n?.text ?? "" });
+        set({ selectedId: id, selectedRelationId: null, editingRelationId: null, editingId: id, editSeed: seed ?? null, editDraft: seed ?? n?.text ?? "" });
       },
       setDraft: (editDraft) => set({ editDraft }),
       cancelEdit: () => set({ editingId: null, editSeed: null, editDraft: null }),
@@ -258,7 +291,7 @@ export const useMindMap = create<MindMapState>()(
           nodes[child.id] = { ...child, x: parent.x, y: parent.y };
           nodes = relaid(s, nodes);
         }
-        commit({ nodes, selectedId: child.id, editingId: edit ? child.id : null, editSeed: null, editDraft: edit ? child.text : null });
+        commit({ nodes, selectedId: child.id, selectedRelationId: null, editingRelationId: null, editingId: edit ? child.id : null, editSeed: null, editDraft: edit ? child.text : null });
         return child.id;
       },
 
@@ -280,7 +313,7 @@ export const useMindMap = create<MindMapState>()(
           const dy = where === "after" ? ns.height + 14 : -(ns.height + 14);
           nodes[sib.id] = { ...sib, x: node.x, y: node.y + dy };
         }
-        commit({ nodes, selectedId: sib.id, editingId: edit ? sib.id : null, editSeed: null, editDraft: edit ? sib.text : null });
+        commit({ nodes, selectedId: sib.id, selectedRelationId: null, editingRelationId: null, editingId: edit ? sib.id : null, editSeed: null, editDraft: edit ? sib.text : null });
         return sib.id;
       },
 
@@ -296,6 +329,7 @@ export const useMindMap = create<MindMapState>()(
         for (const d of [id, ...gone]) delete nodes[d];
         commit({
           nodes: settle(nodes),
+          relations: liveRelations(s.relations, nodes),
           selectedId: nextSel,
           editingId: null,
           editDraft: null,
@@ -385,6 +419,42 @@ export const useMindMap = create<MindMapState>()(
       notify: (text) => set({ notice: { text, stamp: Date.now() } }),
       dismissNotice: () => set({ notice: null }),
 
+      addRelation: (from, to) => {
+        const s = get();
+        if (from === to || !s.nodes[from] || !s.nodes[to]) return null;
+        const existing = s.relations.find((r) => (r.from === from && r.to === to) || (r.from === to && r.to === from));
+        if (existing) {
+          set({ selectedRelationId: existing.id, selectedId: null, editingRelationId: null });
+          s.notify("Esas dos ideas ya están relacionadas");
+          return existing.id;
+        }
+        const rel: Relation = { id: nanoid(10), from, to, label: "" };
+        // recién creada, queda lista para escribirle el nombre (Enter vacío = sin nombre)
+        commit({ relations: [...s.relations, rel], selectedRelationId: rel.id, editingRelationId: rel.id, selectedId: null });
+        return rel.id;
+      },
+      selectRelation: (id) => set({ selectedRelationId: id, editingRelationId: null, ...(id ? { selectedId: null } : null) }),
+      startRelationEdit: (id) => set({ selectedRelationId: id, editingRelationId: id, selectedId: null }),
+      commitRelationLabel: (id, raw) => {
+        const s = get();
+        set({ editingRelationId: null });
+        const r = s.relations.find((x) => x.id === id);
+        if (!r || raw === null) return;
+        const label = raw.trim().slice(0, 200);
+        if (label === r.label) return;
+        commit({ relations: s.relations.map((x) => (x.id === id ? { ...x, label } : x)) });
+      },
+      reverseRelation: (id) => {
+        const s = get();
+        commit({ relations: s.relations.map((x) => (x.id === id ? { ...x, from: x.to, to: x.from } : x)) });
+      },
+      deleteRelation: (id) => {
+        const s = get();
+        if (!s.relations.some((r) => r.id === id)) return;
+        commit({ relations: s.relations.filter((r) => r.id !== id), selectedRelationId: null, editingRelationId: null });
+        get().notify("Relación borrada · Ctrl Z para recuperarla");
+      },
+
       beginDrag: () => {
         const s = get();
         set({ dragging: true, past: [...s.past, snap(s)].slice(-HISTORY_LIMIT), future: [] });
@@ -465,6 +535,8 @@ export const useMindMap = create<MindMapState>()(
           future: [snap(s), ...s.future],
           editingId: null,
           editDraft: null,
+          editingRelationId: null,
+          selectedRelationId: prev.relations.some((r) => r.id === s.selectedRelationId) ? s.selectedRelationId : null,
           lastDeleted: null,
           selectedId: prev.nodes[s.selectedId ?? ""] ? s.selectedId : prev.rootId,
           revision: s.revision + 1,
@@ -481,6 +553,8 @@ export const useMindMap = create<MindMapState>()(
           future: s.future.slice(1),
           editingId: null,
           editDraft: null,
+          editingRelationId: null,
+          selectedRelationId: next.relations.some((r) => r.id === s.selectedRelationId) ? s.selectedRelationId : null,
           lastDeleted: null,
           selectedId: next.nodes[s.selectedId ?? ""] ? s.selectedId : next.rootId,
           revision: s.revision + 1,

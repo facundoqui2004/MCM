@@ -3,6 +3,8 @@
 import {
   Background,
   BackgroundVariant,
+  ConnectionLineType,
+  ConnectionMode,
   ReactFlow,
   useReactFlow,
   useViewport,
@@ -20,9 +22,18 @@ import { useTheme } from "@/features/theme/theme-store";
 import { THEMES } from "@/features/theme/themes";
 import { BranchEdge } from "./branch-edge";
 import { MindNode } from "./mind-node";
+import { RelationEdge } from "./relation-edge";
 
 const nodeTypes = { mind: MindNode };
-const edgeTypes = { branch: BranchEdge };
+const edgeTypes = { branch: BranchEdge, relation: RelationEdge };
+
+/** La idea que está bajo el puntero (para soltar la flecha en cualquier parte de la idea, no solo en un punto) */
+function nodeUnderPointer(e: MouseEvent | TouchEvent): string | null {
+  const p = "changedTouches" in e ? e.changedTouches[0] : e;
+  if (!p) return null;
+  const el = document.elementFromPoint(p.clientX, p.clientY)?.closest<HTMLElement>(".react-flow__node");
+  return el?.dataset.id ?? null;
+}
 
 /** Textos accesibles de React Flow en español (por defecto vienen en inglés). */
 const ariaLabels = {
@@ -58,6 +69,8 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
   const selectedId = useMindMap((s) => s.selectedId);
   const editingId = useMindMap((s) => s.editingId);
   const dragging = useMindMap((s) => s.dragging);
+  const relations = useMindMap((s) => s.relations);
+  const [connecting, setConnecting] = useState(false);
   const theme = useTheme((s) => s.theme);
   const themeDef = THEMES.find((t) => t.id === theme) ?? THEMES[0];
   const rf = useReactFlow();
@@ -112,13 +125,17 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     measured: measured.current.get(id) ?? measureNode(nodes[id].text, depths[id]),
   }));
 
-  const rfEdges: Edge[] = useMemo(
-    () =>
-      ids
-        .filter((id) => id !== rootId)
-        .map((id) => ({ id: `e-${id}`, source: nodes[id].parentId!, target: id, type: "branch", zIndex: 0 })),
-    [ids, nodes, rootId],
-  );
+  const rfEdges: Edge[] = useMemo(() => {
+    const visible = new Set(ids);
+    const tree: Edge[] = ids
+      .filter((id) => id !== rootId)
+      .map((id) => ({ id: `e-${id}`, source: nodes[id].parentId!, target: id, type: "branch", zIndex: 0 }));
+    // las relaciones con un extremo dentro de una rama plegada no se dibujan (vuelven al desplegar)
+    const rel: Edge[] = relations
+      .filter((r) => visible.has(r.from) && visible.has(r.to))
+      .map((r) => ({ id: `r-${r.id}`, source: r.from, target: r.to, type: "relation", zIndex: 1, data: { relId: r.id } }));
+    return [...tree, ...rel];
+  }, [ids, nodes, rootId, relations]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     let dims = false;
@@ -152,7 +169,7 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
   return (
     <div
       ref={wrapper}
-      className={`mm-canvas ${spaceHeld ? "is-panning" : ""}`}
+      className={`mm-canvas ${spaceHeld ? "is-panning" : ""} ${connecting ? "is-connecting" : ""}`}
       role="application"
       aria-roledescription="mapa mental"
       aria-label="Lienzo del mapa. Flechas para moverte, Tab para agregar una idea hija, Enter para una hermana, Esc para salir al resto de la interfaz."
@@ -181,6 +198,24 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         onNodeClick={(_, n) => useMindMap.getState().select(n.id)}
         onNodeDoubleClick={(_, n) => useMindMap.getState().startEdit(n.id)}
         onPaneClick={() => useMindMap.getState().select(null)}
+        onEdgeClick={(_, e) => e.type === "relation" && useMindMap.getState().selectRelation((e.data as { relId: string }).relId)}
+        onEdgeDoubleClick={(_, e) => e.type === "relation" && useMindMap.getState().startRelationEdit((e.data as { relId: string }).relId)}
+        // Flechas de relación: se arrastran desde los puntos de las esquinas de una idea
+        // y se sueltan sobre cualquier parte de otra idea.
+        connectionMode={ConnectionMode.Loose}
+        connectionLineType={ConnectionLineType.Bezier}
+        connectionLineStyle={{ stroke: "var(--focus)", strokeWidth: 2, strokeDasharray: "6 5" }}
+        connectionRadius={28}
+        onConnectStart={() => setConnecting(true)}
+        onConnect={(c) => {
+          if (c.source && c.target) useMindMap.getState().addRelation(c.source, c.target);
+        }}
+        onConnectEnd={(e, state) => {
+          setConnecting(false);
+          if (state.isValid || !state.fromNode) return;
+          const to = nodeUnderPointer(e);
+          if (to && to !== state.fromNode.id) useMindMap.getState().addRelation(state.fromNode.id, to);
+        }}
         nodeDragThreshold={3}
         fitView={!narrow}
         fitViewOptions={{ padding: 0.3, maxZoom: 1.05 }}
@@ -191,7 +226,7 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
         deleteKeyCode={null}
         selectionKeyCode={null}
         multiSelectionKeyCode={null}
-        nodesConnectable={false}
+        nodesConnectable
         elementsSelectable={false}
         nodesFocusable={false}
         edgesFocusable={false}

@@ -18,6 +18,13 @@ export const mindNodeSchema = z.object({
   y: z.number().finite(),
 });
 
+export const relationSchema = z.object({
+  id: z.string().min(1).max(64),
+  from: z.string().min(1),
+  to: z.string().min(1),
+  label: z.string().max(200),
+});
+
 export const mindMapDocSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -25,6 +32,7 @@ export const mindMapDocSchema = z
     layoutMode: z.enum(["map", "tree", "radial"]),
     autoLayout: z.boolean(),
     nodes: z.record(z.string(), mindNodeSchema),
+    relations: z.array(relationSchema).max(1000).optional(),
   })
   .superRefine((doc, ctx) => {
     const ids = Object.keys(doc.nodes);
@@ -38,6 +46,10 @@ export const mindMapDocSchema = z
       for (const c of n.children)
         if (doc.nodes[c]?.parentId !== n.id)
           ctx.addIssue({ code: "custom", message: `Hijo inconsistente ${c} en ${n.id}` });
+    }
+    for (const r of doc.relations ?? []) {
+      if (!doc.nodes[r.from] || !doc.nodes[r.to] || r.from === r.to)
+        ctx.addIssue({ code: "custom", message: `La relación ${r.id} apunta a ideas que no existen` });
     }
   }) satisfies z.ZodType<MindMapDoc>;
 
