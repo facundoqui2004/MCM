@@ -2,7 +2,7 @@
 
 Editor de mapas mentales en el navegador, pensado para **estudiar y repasar**: armás un tema con el teclado tan rápido como escribís una lista, y después lo plegás y desplegás de a un nivel para autoevaluarte.
 
-**Demo:** [mcm-xi.vercel.app](https://mcm-xi.vercel.app)
+
 
 ![Los cuatro temas claros de Mindmap Studio](docs/temas.jpg)
 
