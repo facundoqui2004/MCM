@@ -30,6 +30,11 @@ export interface MindNodeModel {
   /** Índice en la paleta de acentos; lo heredan los descendientes */
   color: number;
   collapsed: boolean;
+  /**
+   * Nota asociada en Markdown (opcional). Se ve al pasar el cursor por la idea
+   * y se edita en una ventana fijada. Los mapas viejos no la tienen.
+   */
+  note?: string;
   /** Esquina superior izquierda en coordenadas del lienzo */
   x: number;
   y: number;

@@ -16,6 +16,7 @@ Editor de mapas mentales en el navegador, pensado para **estudiar y repasar**: a
   - Guardado automático con reintento si se corta la conexión.
   - Aviso al borrar con botón *Deshacer*.
   - Si el mismo mapa se edita en dos pestañas, ofrece guardar tu versión como copia.
+- **Notas por idea (estilo Obsidian):** al dejar el cursor sobre una idea con nota aparece una vista previa en Markdown (las ideas sin nota no muestran nada, para no molestar mientras armás el mapa; se les agrega nota con el botón que aparece al pasar el cursor o con `Ctrl Enter`). Un clic sobre la vista previa la fija como ventana flotante para escribir ahí mismo (se arrastra, se agranda, se guarda sola). `Ctrl Enter` abre la nota de la idea seleccionada. La búsqueda también encuentra texto dentro de las notas.
 - **5 temas:** Papel, Cuaderno, Lavanda, Minimal y Estudio oscuro.
 - **Exportar e importar** mapas como JSON.
 - **Accesible y adaptable:**
@@ -69,6 +70,9 @@ Si falta la base, la app muestra un error que dice qué variable configurar.
 | `-` / `+` | Plegar todo / desplegar un nivel |
 | Flechas | Moverse entre ideas |
 | `Esc` | Soltar la selección |
+| Cursor sobre una idea con nota | Ver su nota |
+| Clic en la vista previa / `Ctrl Enter` | Fijar la nota para escribir |
+| `Esc` dentro de la nota | Cerrar la ventana |
 | `Ctrl F` | Buscar en el mapa |
 | `Ctrl C` | Copiar la rama como lista |
 | `Ctrl Z` / `Ctrl Shift Z` | Deshacer / rehacer |

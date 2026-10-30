@@ -13,6 +13,7 @@ export const mindNodeSchema = z.object({
   side: z.enum(["left", "right"]),
   color: z.number().int().min(0).max(64),
   collapsed: z.boolean(),
+  note: z.string().max(20000).optional(),
   x: z.number().finite(),
   y: z.number().finite(),
 });

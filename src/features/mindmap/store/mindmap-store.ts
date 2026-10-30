@@ -63,6 +63,11 @@ export interface MindMapState extends Snapshot {
   /** Despliega el nivel plegado menos profundo: repetirlo revela el mapa de a un nivel */
   expandLevel: () => void;
   dismissDeleted: () => void;
+  /**
+   * Guarda la nota de una idea. Con `history: false` el cambio se suma al
+   * último paso del historial: así una sesión de escritura se deshace de una vez.
+   */
+  setNote: (id: string, note: string, opts?: { history?: boolean }) => void;
   /** Despliega los ancestros plegados de una idea y la selecciona (búsqueda) */
   reveal: (id: string) => void;
   notify: (text: string) => void;
@@ -298,6 +303,19 @@ export const useMindMap = create<MindMapState>()(
         });
       },
       dismissDeleted: () => set({ lastDeleted: null }),
+
+      setNote: (id, note, opts = {}) => {
+        const s = get();
+        const n = s.nodes[id];
+        if (!n || (n.note ?? "") === note) return;
+        const next: MindNodeModel = { ...n };
+        // "" borra la nota; espacios o saltos sueltos se conservan mientras se escribe.
+        // Mismo tope que el esquema de la API: si no, el autoguardado fallaría siempre.
+        if (note) next.note = note.slice(0, 20000);
+        else delete next.note;
+        // la nota no cambia el tamaño de la idea: no hace falta re-layout
+        commit({ nodes: { ...s.nodes, [id]: next } }, { history: opts.history ?? true });
+      },
 
       toggleCollapse: (id, value) => {
         const s = get();

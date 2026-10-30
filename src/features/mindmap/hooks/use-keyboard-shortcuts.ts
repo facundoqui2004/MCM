@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toOutline } from "../model/tree";
 import { useMindMap } from "../store/mindmap-store";
+import { useNoteUi } from "../store/note-ui-store";
 
 const isTypingTarget = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
@@ -50,6 +51,12 @@ export function useKeyboardShortcuts({ onSave, onFind }: { onSave: () => void; o
       if (mod && e.key.toLowerCase() === "f") {
         e.preventDefault();
         onFind();
+        return;
+      }
+      // Ctrl Enter: abre (fija) la nota de la idea seleccionada para escribir en ella
+      if (mod && e.key === "Enter" && sel) {
+        e.preventDefault();
+        useNoteUi.getState().pin(sel);
         return;
       }
       // Ctrl C sobre una idea: copia la rama como lista con sangría (para pegar en apuntes).

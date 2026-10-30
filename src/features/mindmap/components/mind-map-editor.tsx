@@ -14,6 +14,8 @@ import { exportFileSchema, mindMapDocSchema, type ExportFile } from "../model/sc
 import type { MindMapRecord } from "../model/types";
 import { useMindMap, type SaveStatus } from "../store/mindmap-store";
 import { Dock } from "./dock";
+import { NotePreview } from "./note-preview";
+import { NoteWindows } from "./note-window";
 import { ThemePicker } from "@/features/theme/theme-picker";
 import { MindMapCanvas } from "./mind-map-canvas";
 
@@ -40,6 +42,9 @@ const SHORTCUTS: [string, string][] = [
   ["Esc", "Soltar la selección"],
   ["Espacio + arrastrar", "Mover el lienzo"],
   ["Rueda o pellizco", "Zoom"],
+  ["Cursor sobre una idea con nota", "Ver la nota"],
+  ["Clic en la vista previa", "Fijarla para escribir"],
+  ["Ctrl Enter", "Abrir la nota de la idea"],
   ["Ctrl F", "Buscar en el mapa"],
   ["Ctrl C", "Copiar la rama como lista"],
   ["Ctrl Z", "Deshacer"],
@@ -116,7 +121,7 @@ function FindBar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const walk = (id: string) => {
       const n = nodes[id];
       if (!n) return;
-      if (normalize(n.text).includes(q)) out.push(id);
+      if (normalize(n.text).includes(q) || (n.note && normalize(n.note).includes(q))) out.push(id);
       n.children.forEach(walk);
     };
     walk(rootId);
@@ -435,6 +440,8 @@ export function MindMapEditor({ initial }: { initial: MindMapRecord }) {
         <NoticeToast />
         <SelectionAnnouncer />
         <Dock />
+        <NotePreview />
+        <NoteWindows />
         <input
           ref={fileInput}
           type="file"

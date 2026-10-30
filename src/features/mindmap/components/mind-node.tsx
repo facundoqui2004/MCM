@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, NotebookText } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { outwardOf, siblingAxis } from "../model/geometry";
@@ -10,6 +10,7 @@ import { accentOf } from "../model/palette";
 import { depthOf, descendantsOf } from "../model/tree";
 import type { Direction } from "../model/types";
 import { useMindMap } from "../store/mindmap-store";
+import { useNoteUi } from "../store/note-ui-store";
 
 const ARROW = { left: ArrowLeft, right: ArrowRight, top: ArrowUp, bottom: ArrowDown } as const;
 
@@ -183,6 +184,7 @@ function MindNodeImpl({ id }: NodeProps) {
   const sib = siblingAxis(outward);
   const s = useMindMap.getState;
   const multiline = size.lines > 1;
+  const hasNote = !!node.note?.trim();
 
   const tier = isRoot ? "mm-node--root" : depth === 1 ? "mm-node--branch" : "mm-node--leaf";
 
@@ -190,8 +192,14 @@ function MindNodeImpl({ id }: NodeProps) {
     <div
       className="relative"
       style={{ ["--accent" as string]: accent }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={() => {
+        setHover(true);
+        useNoteUi.getState().setHover(id);
+      }}
+      onMouseLeave={() => {
+        setHover(false);
+        if (useNoteUi.getState().hoverId === id) useNoteUi.getState().setHover(null);
+      }}
     >
       <Handle type="target" position={Position.Left} className="mm-handle" isConnectable={false} />
       <Handle type="source" position={Position.Right} className="mm-handle" isConnectable={false} />
@@ -224,6 +232,25 @@ function MindNodeImpl({ id }: NodeProps) {
           </div>
         )}
       </motion.div>
+
+      {/* Marca de nota: la idea tiene apuntes. Sin nota, aparece al pasar el cursor
+          para poder escribir una con el mouse. Clic = abrirla fijada */}
+      {(hasNote || showControls) && !editing && (
+        <button
+          type="button"
+          className={`mm-note-badge nodrag nopan ${hasNote ? "" : "mm-note-badge--add"}`}
+          aria-label={hasNote ? "Abrir la nota de esta idea" : "Escribir una nota para esta idea"}
+          title={hasNote ? "Abrir nota (Ctrl Enter)" : "Agregar nota (Ctrl Enter)"}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            s().select(id);
+            useNoteUi.getState().pin(id);
+          }}
+        >
+          <NotebookText size={10} strokeWidth={2.4} />
+        </button>
+      )}
 
       {/* Plegar / desplegar: pegado al borde por donde salen las ramas */}
       {!isRoot && hasChildren && (node.collapsed || showControls) && (
