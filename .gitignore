@@ -43,3 +43,7 @@ next-env.d.ts
 data/
 .next-dev/
 .impeccable/questions/
+
+# herramientas locales (no van al repo)
+.claude/
+.impeccable/
