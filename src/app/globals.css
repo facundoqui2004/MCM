@@ -1,0 +1,1422 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/* Tokens                                                             */
+/* ------------------------------------------------------------------ */
+:root {
+  /* Los valores viven en los bloques [data-theme] al final del archivo */
+  --font-ui: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme inline {
+  --font-sans: var(--font-ui);
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+kbd {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--hair-strong);
+  border-bottom-width: 2px;
+  background: var(--overlay);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ */
+/* Lienzo                                                             */
+/* ------------------------------------------------------------------ */
+.mm-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 40%, var(--canvas) 0%, var(--canvas-deep) 100%);
+}
+
+.mm-canvas {
+  position: absolute;
+  inset: 0;
+}
+.mm-canvas.is-panning,
+.mm-canvas.is-panning .react-flow__node {
+  cursor: grab;
+}
+
+.mm-aura {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background-image:
+    radial-gradient(38% 32% at 30% 35%, var(--aura-a), transparent 70%),
+    radial-gradient(34% 30% at 72% 65%, var(--aura-b), transparent 70%);
+  background-repeat: no-repeat;
+  transition: opacity 0.6s ease;
+}
+
+.react-flow {
+  --xy-background-color: transparent;
+  background: transparent;
+}
+.react-flow__attribution {
+  background: transparent !important;
+  opacity: 0.35;
+}
+.react-flow__attribution a {
+  color: var(--ink-mute) !important;
+}
+.react-flow__node {
+  cursor: default;
+}
+.react-flow__node.dragging {
+  cursor: grabbing;
+}
+
+.mm-handle {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  top: 50% !important;
+  left: 50% !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Nodos: cápsulas de vidrio                                          */
+/* ------------------------------------------------------------------ */
+.mm-node {
+  position: relative;
+  box-sizing: border-box;
+  color: var(--ink);
+  border: 1px solid var(--hair);
+  background: var(--node-bg);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: var(--shadow-float);
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.mm-node--branch {
+  border-color: color-mix(in oklab, var(--accent) 42%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--accent) var(--branch-tint), transparent), color-mix(in oklab, var(--accent) 4%, transparent)),
+    var(--node-branch-base);
+}
+.mm-node--branch .mm-label {
+  color: color-mix(in oklab, var(--accent) var(--branch-ink-mix), var(--ink));
+}
+
+.mm-node--leaf {
+  border-color: color-mix(in oklab, var(--accent) 18%, var(--hair));
+  background: var(--node-leaf-bg);
+}
+.mm-node--leaf .mm-label {
+  color: var(--ink-leaf);
+}
+
+.mm-node:hover {
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
+.mm-node.is-selected {
+  border-color: var(--accent);
+  box-shadow:
+    var(--shadow-float),
+    0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent),
+    0 0 32px -4px color-mix(in oklab, var(--accent) 50%, transparent);
+}
+.mm-node.is-editing {
+  border-color: var(--accent);
+  box-shadow:
+    var(--shadow-float),
+    0 0 0 3px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+/* Raíz: anillo cónico que gira despacio, el único gesto llamativo del lienzo */
+.mm-node--root {
+  border-color: transparent;
+  background: var(--node-root-bg);
+  box-shadow:
+    var(--shadow-float),
+    var(--root-glow);
+}
+.mm-root-ring {
+  position: absolute;
+  inset: calc(var(--ring-width) * -1);
+  border-radius: inherit;
+  padding: var(--ring-width);
+  background: var(--root-ring);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: mm-ring 14s linear infinite;
+  opacity: 0.85;
+}
+.mm-node--root.is-selected .mm-root-ring {
+  opacity: 1;
+  animation-duration: 6s;
+}
+@property --ring-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes mm-ring {
+  to {
+    --ring-angle: 360deg;
+  }
+}
+
+.mm-label {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: center;
+  user-select: none;
+  letter-spacing: -0.005em;
+}
+.mm-node--root .mm-label {
+  letter-spacing: -0.02em;
+  color: var(--root-ink);
+  font-weight: var(--root-weight) !important;
+}
+
+.mm-editor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--ink);
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 0;
+  outline: none;
+  caret-color: var(--accent);
+}
+.mm-editor::selection {
+  background: color-mix(in oklab, var(--accent) 40%, transparent);
+}
+
+/* Botones de crecimiento rápido */
+.mm-quick {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: var(--glass-strong);
+  border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-small);
+  cursor: pointer;
+}
+.mm-quick:hover {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 18px -2px color-mix(in oklab, var(--accent) 70%, transparent);
+}
+.mm-quick--sibling {
+  width: 18px;
+  height: 18px;
+  border-color: var(--hair-strong);
+  background: var(--surface-solid);
+}
+.mm-quick--child {
+  width: 26px;
+  height: 26px;
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+
+.mm-collapse {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 2px solid var(--canvas);
+  cursor: pointer;
+  box-shadow: 0 0 14px -2px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Conexiones                                                         */
+/* ------------------------------------------------------------------ */
+.mm-edge-glow {
+  filter: blur(5px);
+}
+.mm-edge-pulse {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mm-edge-pulse {
+    display: none;
+  }
+  .mm-root-ring {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Barra superior y paneles                                           */
+/* ------------------------------------------------------------------ */
+.mm-topbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 470px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.mm-topbar > * {
+  pointer-events: auto;
+}
+.mm-back,
+.mm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 9px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--glass-strong);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(14px);
+  transition: color 0.15s, border-color 0.15s;
+}
+.mm-back:hover,
+.mm-chip:hover {
+  color: var(--ink);
+  border-color: var(--hair-strong);
+}
+.mm-topright {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+}
+.mm-chip {
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.mm-title {
+  min-width: 0;
+  max-width: min(46vw, 520px);
+  height: 36px;
+  padding: 0 10px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  outline: none;
+  text-overflow: ellipsis;
+}
+.mm-title:hover {
+  border-color: var(--hair);
+}
+.mm-title:focus {
+  border-color: var(--hair-strong);
+  background: var(--glass-strong);
+}
+
+.mm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mm-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: none;
+}
+.mm-status.is-saved i {
+  background: var(--ok);
+}
+.mm-status.is-saving i,
+.mm-status.is-dirty i {
+  background: var(--warn);
+}
+.mm-status.is-error,
+.mm-status.is-conflict {
+  color: var(--danger);
+}
+
+.mm-help {
+  position: absolute;
+  top: 62px;
+  right: 16px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px 16px 10px;
+  border-radius: 18px;
+  background: var(--glass-strong);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-float);
+  z-index: 40;
+}
+.mm-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.mm-help h2 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 650;
+}
+.mm-help-head button {
+  color: var(--ink-mute);
+  padding: 4px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.mm-help-head button:hover {
+  color: var(--ink);
+  background: var(--overlay);
+}
+.mm-help dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--hair-soft);
+  font-size: 13px;
+}
+.mm-help dt {
+  color: var(--ink-soft);
+}
+
+.mm-hint-wrap {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 104px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.mm-hint {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: center;
+  max-width: 52ch;
+}
+.mm-hint kbd {
+  margin: 0 2px;
+}
+
+.mm-toast {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  translate: -50% 0;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--ink);
+  background: color-mix(in oklab, var(--danger) 14%, var(--surface-solid));
+  border: 1px solid color-mix(in oklab, var(--danger) 45%, transparent);
+  z-index: 50;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dock flotante                                                      */
+/* ------------------------------------------------------------------ */
+.mm-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 20px;
+  background: var(--dock-bg);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: var(--shadow-float);
+  z-index: 30;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mm-dock-group {
+  display: flex;
+  gap: 2px;
+}
+.mm-dock-sep {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--hair);
+  flex: none;
+}
+.mm-dock-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+.mm-dock-btn:hover:not(.is-disabled) {
+  color: var(--ink);
+  background: var(--overlay);
+}
+.mm-dock-btn.is-danger:hover:not(.is-disabled) {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+}
+.mm-dock-btn.is-disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+.mm-dock-btn.is-disabled:hover {
+  background: transparent;
+  color: var(--ink-soft);
+}
+.mm-tip-reason {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.mm-tip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--surface-solid);
+  border: 1px solid var(--hair-strong);
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+}
+
+.mm-segment {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 13px;
+  background: var(--segment-bg);
+  border: 1px solid var(--hair-soft);
+}
+.mm-segment-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.mm-segment-btn:hover {
+  color: var(--ink-soft);
+}
+.mm-segment-btn.is-on {
+  color: var(--pill-ink);
+}
+.mm-segment-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--pill-bg);
+  border: 1px solid var(--pill-border);
+  box-shadow: var(--shadow-small);
+}
+
+@media (max-width: 720px) {
+  .mm-dock {
+    bottom: 12px;
+    gap: 2px;
+    padding: 5px;
+  }
+  .mm-dock-btn {
+    width: 34px;
+  }
+  .mm-dock-sep {
+    margin: 0 2px;
+  }
+  .mm-segment-text {
+    display: none;
+  }
+  .mm-segment-btn {
+    padding: 0 9px;
+  }
+  .mm-status {
+    display: none;
+  }
+  .mm-chip span {
+    display: none;
+  }
+  .mm-chip {
+    padding: 0 10px;
+  }
+  .mm-topbar {
+    right: 184px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Inicio: lista de mapas                                             */
+/* ------------------------------------------------------------------ */
+.home {
+  min-height: 100%;
+  /* fondo a todo el ancho, contenido limitado a ~830px por el padding lateral */
+  padding: 72px max(16px, calc((100% - 828px) / 2)) 64px;
+  background:
+    radial-gradient(60% 40% at 15% 0%, var(--aura-a), transparent 70%),
+    radial-gradient(50% 35% at 100% 10%, var(--aura-b), transparent 70%);
+}
+.home-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+.home-head h1 {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 7vw, 64px);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+.home-head p {
+  margin-top: 12px;
+  max-width: 44ch;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.home-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--glass);
+  border: 1px solid var(--hair);
+  cursor: pointer;
+}
+.home-btn.is-primary {
+  color: var(--primary-ink);
+  background: var(--primary-bg);
+  border-color: transparent;
+  box-shadow: var(--primary-shadow);
+}
+.home-btn:disabled {
+  opacity: 0.7;
+}
+.home-empty {
+  padding: 28px;
+  border-radius: 20px;
+  border: 1px dashed var(--hair-strong);
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 60ch;
+}
+.home-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hair);
+}
+.home-item {
+  position: relative;
+  border-bottom: 1px solid var(--hair);
+}
+.home-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 20px;
+  padding: 18px 56px 18px 4px;
+  transition: background-color 0.15s;
+}
+.home-row:hover {
+  background: var(--overlay-soft);
+}
+.home-row-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-row:hover .home-row-title {
+  color: var(--ink-strong);
+}
+.home-row-meta {
+  font-size: 13px;
+  color: var(--ink-mute);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.home-delete {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  translate: 0 -50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: var(--ink-mute);
+  cursor: pointer;
+}
+.home-delete:hover,
+.home-delete.is-confirming {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+}
+@media (max-width: 560px) {
+  .home-row {
+    grid-template-columns: 1fr auto;
+  }
+  .home-row-meta:last-of-type {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Estado de guardado con acción                                      */
+/* ------------------------------------------------------------------ */
+.mm-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mm-status-action {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: color-mix(in oklab, var(--danger) 18%, transparent);
+  border: 1px solid color-mix(in oklab, var(--danger) 45%, transparent);
+  cursor: pointer;
+}
+.mm-status-action:hover {
+  background: color-mix(in oklab, var(--danger) 28%, transparent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Aviso de borrado con Deshacer                                      */
+/* ------------------------------------------------------------------ */
+.mm-undo-wrap {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 84px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 35;
+}
+.mm-undo {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 100%;
+  padding: 8px 8px 8px 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--surface-solid);
+  border: 1px solid var(--hair-strong);
+  box-shadow: var(--shadow-pop);
+}
+.mm-undo span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm-undo button {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-weight: 600;
+  color: var(--on-ink);
+  background: var(--ink);
+  cursor: pointer;
+}
+.mm-undo button:hover {
+  background: var(--ink-strong);
+}
+
+/* ------------------------------------------------------------------ */
+/* Dock: etiquetas visibles en las acciones principales               */
+/* ------------------------------------------------------------------ */
+.mm-dock-btn.has-text {
+  width: auto;
+  display: inline-flex;
+  gap: 6px;
+  padding: 0 11px 0 9px;
+}
+.mm-dock-text {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ */
+/* Táctil: áreas de toque de al menos 44 px sin agrandar el dibujo     */
+/* ------------------------------------------------------------------ */
+@media (pointer: coarse) {
+  .mm-quick,
+  .mm-collapse {
+    position: relative;
+  }
+  .mm-quick::before,
+  .mm-collapse::before {
+    content: "";
+    position: absolute;
+    inset: -12px;
+    border-radius: 999px;
+  }
+  .mm-quick--child {
+    width: 32px;
+    height: 32px;
+  }
+  .mm-quick--sibling {
+    width: 24px;
+    height: 24px;
+  }
+  .mm-dock-btn,
+  .mm-segment-btn {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 720px) {
+  .mm-dock-optional,
+  .mm-dock-text {
+    display: none;
+  }
+  .mm-dock-btn.has-text {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+::selection {
+  background: var(--selection);
+  color: var(--ink-strong);
+}
+
+/* ------------------------------------------------------------------ */
+/* Búsqueda dentro del mapa                                           */
+/* ------------------------------------------------------------------ */
+.mm-find {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(440px, calc(100vw - 32px));
+  height: 42px;
+  padding: 0 6px 0 12px;
+  border-radius: 14px;
+  color: var(--ink-soft);
+  background: var(--glass-strong);
+  border: 1px solid var(--hair-strong);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-float);
+  z-index: 45;
+}
+.mm-find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+  font-size: 14px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.mm-find input::placeholder {
+  color: var(--ink-mute);
+}
+.mm-find-count {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+  padding-right: 4px;
+}
+.mm-find button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.mm-find button:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--overlay);
+}
+.mm-find button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mm-notice-wrap {
+  bottom: 132px;
+}
+.mm-status-action.is-primary {
+  color: var(--on-ink);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.mm-status-action.is-primary:hover {
+  background: var(--ink-strong);
+}
+
+/* Entre tablet y escritorio chico, la barra derecha queda sólo con íconos */
+@media (max-width: 1180px) {
+  .mm-chip span {
+    display: none;
+  }
+  .mm-chip {
+    padding: 0 10px;
+  }
+  .mm-topbar {
+    right: 200px;
+  }
+}
+@media (max-width: 720px) {
+  .mm-topbar {
+    right: 184px;
+  }
+}
+
+/* Celular: se ocultan exportar/importar (son de escritorio) y el estado normal de
+   guardado, pero un error o un conflicto se muestran siempre, en una franja propia */
+@media (max-width: 720px) {
+  .mm-chip-wide {
+    display: none;
+  }
+  .mm-topbar {
+    right: 108px;
+  }
+  .mm-status.is-error,
+  .mm-status.is-conflict {
+    display: flex;
+    flex-wrap: wrap;
+    position: fixed;
+    top: 62px;
+    left: 12px;
+    right: 12px;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    white-space: normal;
+    background: color-mix(in oklab, var(--danger) 12%, var(--surface-solid));
+    border: 1px solid color-mix(in oklab, var(--danger) 40%, transparent);
+    z-index: 46;
+  }
+  .mm-status.is-error > i,
+  .mm-status.is-conflict > i {
+    display: none;
+  }
+  .mm-status.is-error .mm-status-text,
+  .mm-status.is-conflict .mm-status-text {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+}
+
+/* ================================================================== */
+/* Temas                                                              */
+/* Cada tema define los mismos tokens. "paper" es el principal.       */
+/* Los acentos de ramas superan 4,5:1 contra blanco en los temas      */
+/* claros, porque también colorean las pastillas de plegado.         */
+/* ================================================================== */
+
+/* Opción 1 — Papel cálido (principal) */
+:root,
+[data-theme="paper"] {
+  color-scheme: light;
+  --canvas: #fdf6ec;
+  --canvas-deep: #f7ead8;
+  --ink: #2b2420;
+  --ink-strong: #120e0b;
+  --ink-soft: #5e544c;
+  --ink-mute: #7a6d62;
+  --ink-leaf: #3b332d;
+  --on-ink: #fdf6ec;
+  --on-accent: #ffffff;
+  --hair: rgba(70, 45, 20, 0.12);
+  --hair-strong: rgba(70, 45, 20, 0.2);
+  --hair-soft: rgba(70, 45, 20, 0.07);
+  --overlay: rgba(70, 45, 20, 0.06);
+  --overlay-soft: rgba(70, 45, 20, 0.03);
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-strong: rgba(255, 255, 255, 0.92);
+  --surface-solid: #ffffff;
+  --dock-bg: rgba(255, 255, 255, 0.94);
+  --segment-bg: transparent;
+  --pill-bg: #fde4d8;
+  --pill-border: transparent;
+  --pill-ink: #b8461f;
+  --node-bg: #fffdf9;
+  --node-branch-base: #fffdf9;
+  --node-leaf-bg: #ffffff;
+  --node-root-bg: #ffffff;
+  --branch-tint: 10%;
+  --branch-ink-mix: 55%;
+  --root-ink: #2b2420;
+  --root-weight: 650;
+  --root-accent: #e5764d;
+  --root-ring: linear-gradient(135deg, #e5764d, #f2a65a 55%, #e5764d);
+  --ring-width: 2.5px;
+  --root-glow: 0 14px 34px -14px rgba(229, 118, 77, 0.55);
+  --branch-0: #c24a24;
+  --branch-1: #0f7f74;
+  --branch-2: #7354cc;
+  --branch-3: #966405;
+  --branch-4: #2f72cc;
+  --branch-5: #cc3f6e;
+  --aura-a: rgba(242, 166, 90, 0.12);
+  --aura-b: rgba(229, 118, 77, 0.06);
+  --grid-color: rgba(120, 85, 50, 0.34);
+  --focus: #c24a24;
+  --ok: #2f9e5e;
+  --warn: #d48a12;
+  --danger: #c43a3a;
+  --selection: rgba(229, 118, 77, 0.28);
+  --primary-bg: linear-gradient(180deg, #ef8a62, #e0683f);
+  --primary-ink: #ffffff;
+  --primary-shadow: 0 10px 26px -12px rgba(224, 104, 63, 0.8);
+  --shadow-small: 0 2px 6px -2px rgba(70, 45, 20, 0.18);
+  --shadow-pop: 0 12px 30px -12px rgba(70, 45, 20, 0.3);
+  --shadow-float:
+    0 1px 2px rgba(70, 45, 20, 0.06),
+    0 8px 22px -10px rgba(70, 45, 20, 0.22);
+}
+
+/* Opción 2 — Cuaderno cuadriculado */
+[data-theme="grid"] {
+  color-scheme: light;
+  --canvas: #eef4fc;
+  --canvas-deep: #e4edf9;
+  --ink: #1d2940;
+  --ink-strong: #0b1222;
+  --ink-soft: #4a5874;
+  --ink-mute: #5f6d87;
+  --ink-leaf: #26324a;
+  --on-ink: #eef4fc;
+  --hair: rgba(40, 80, 150, 0.14);
+  --hair-strong: rgba(40, 80, 150, 0.22);
+  --hair-soft: rgba(40, 80, 150, 0.08);
+  --overlay: rgba(40, 80, 150, 0.07);
+  --overlay-soft: rgba(40, 80, 150, 0.035);
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-strong: rgba(255, 255, 255, 0.9);
+  --surface-solid: #ffffff;
+  --dock-bg: rgba(255, 255, 255, 0.9);
+  --pill-bg: #ffffff;
+  --pill-border: rgba(40, 80, 150, 0.16);
+  --pill-ink: #2d66d0;
+  --node-bg: #ffffff;
+  --node-branch-base: #ffffff;
+  --node-leaf-bg: #ffffff;
+  --node-root-bg: #ffffff;
+  --root-ink: #1d2940;
+  --root-accent: #5b86e5;
+  --root-ring: linear-gradient(120deg, #4a8fe2, #8f6ae8);
+  --root-glow: 0 14px 34px -14px rgba(110, 120, 230, 0.55);
+  --branch-0: #2d66d0;
+  --branch-1: #7148cc;
+  --branch-2: #0f7f74;
+  --branch-3: #8f5f04;
+  --branch-4: #c43a64;
+  --branch-5: #2f8a36;
+  --aura-a: rgba(91, 134, 229, 0.08);
+  --aura-b: rgba(143, 106, 232, 0.06);
+  --grid-color: rgba(60, 100, 170, 0.13);
+  --focus: #2d66d0;
+  --selection: rgba(91, 134, 229, 0.25);
+  --primary-bg: linear-gradient(120deg, #4a8fe2, #8f6ae8);
+  --primary-shadow: 0 10px 26px -12px rgba(110, 120, 230, 0.8);
+  --shadow-small: 0 2px 6px -2px rgba(30, 60, 120, 0.16);
+  --shadow-pop: 0 12px 30px -12px rgba(30, 60, 120, 0.28);
+  --shadow-float:
+    0 1px 2px rgba(30, 60, 120, 0.06),
+    0 8px 22px -10px rgba(30, 60, 120, 0.2);
+}
+
+/* Opción 3 — Lavanda */
+[data-theme="lavender"] {
+  color-scheme: light;
+  --canvas: #ece9f1;
+  --canvas-deep: #e3dfeb;
+  --ink: #2a2533;
+  --ink-strong: #15111c;
+  --ink-soft: #57506a;
+  --ink-mute: #6b6480;
+  --ink-leaf: #332d3e;
+  --on-ink: #ece9f1;
+  --hair: rgba(70, 50, 110, 0.13);
+  --hair-strong: rgba(70, 50, 110, 0.22);
+  --hair-soft: rgba(70, 50, 110, 0.07);
+  --overlay: rgba(70, 50, 110, 0.07);
+  --overlay-soft: rgba(70, 50, 110, 0.035);
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-strong: rgba(255, 255, 255, 0.9);
+  --surface-solid: #ffffff;
+  --dock-bg: rgba(255, 255, 255, 0.92);
+  --pill-bg: #e3ecfb;
+  --pill-border: transparent;
+  --pill-ink: #2b66c9;
+  --node-bg: #ffffff;
+  --node-branch-base: #ffffff;
+  --node-leaf-bg: #ffffff;
+  --node-root-bg: #ffffff;
+  --root-ink: #2a2533;
+  --root-accent: #ee5a8a;
+  --root-ring: linear-gradient(110deg, #ee4f8b, #f58a8a 55%, #f7a46b);
+  --ring-width: 5px;
+  --root-glow: 0 16px 36px -14px rgba(238, 90, 138, 0.5);
+  --branch-0: #c93670;
+  --branch-1: #1f8a5b;
+  --branch-2: #2b66c9;
+  --branch-3: #b8501c;
+  --branch-4: #7a48c8;
+  --branch-5: #0e7f8a;
+  --aura-a: rgba(238, 90, 138, 0.07);
+  --aura-b: rgba(120, 100, 220, 0.06);
+  --grid-color: rgba(110, 90, 150, 0.38);
+  --focus: #c93670;
+  --selection: rgba(238, 90, 138, 0.22);
+  --primary-bg: linear-gradient(110deg, #ee4f8b, #f7a46b);
+  --primary-shadow: 0 10px 26px -12px rgba(238, 90, 138, 0.8);
+  --shadow-small: 0 2px 6px -2px rgba(50, 30, 90, 0.16);
+  --shadow-pop: 0 12px 30px -12px rgba(50, 30, 90, 0.28);
+  --shadow-float:
+    0 1px 2px rgba(50, 30, 90, 0.06),
+    0 8px 22px -10px rgba(50, 30, 90, 0.2);
+}
+
+/* Opción 4 — Minimal */
+[data-theme="minimal"] {
+  color-scheme: light;
+  --canvas: #f1f2f4;
+  --canvas-deep: #eaecef;
+  --ink: #262b33;
+  --ink-strong: #101318;
+  --ink-soft: #535b67;
+  --ink-mute: #646c78;
+  --ink-leaf: #2e343d;
+  --on-ink: #f1f2f4;
+  --hair: rgba(30, 40, 55, 0.12);
+  --hair-strong: rgba(30, 40, 55, 0.2);
+  --hair-soft: rgba(30, 40, 55, 0.07);
+  --overlay: rgba(30, 40, 55, 0.06);
+  --overlay-soft: rgba(30, 40, 55, 0.03);
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-strong: rgba(250, 250, 251, 0.92);
+  --surface-solid: #ffffff;
+  --dock-bg: rgba(248, 249, 250, 0.95);
+  --pill-bg: #e2e5e9;
+  --pill-border: transparent;
+  --pill-ink: #262b33;
+  --node-bg: #fafafb;
+  --node-branch-base: #fafafb;
+  --node-leaf-bg: #ffffff;
+  --node-root-bg: #f6f7f8;
+  --branch-tint: 6%;
+  --branch-ink-mix: 35%;
+  --root-ink: #4a525e;
+  --root-weight: 400;
+  --root-accent: #2a8f9c;
+  --root-ring: linear-gradient(120deg, #1f3d5c, #2a8f9c 60%, #3bbfae);
+  --ring-width: 3.5px;
+  --root-glow: 0 16px 30px -16px rgba(42, 143, 156, 0.45);
+  --branch-0: #1f5b86;
+  --branch-1: #0f7f74;
+  --branch-2: #5b5fc4;
+  --branch-3: #8f5f04;
+  --branch-4: #b23c5c;
+  --branch-5: #3b7a3b;
+  --aura-a: rgba(0, 0, 0, 0);
+  --aura-b: rgba(0, 0, 0, 0);
+  --grid-color: transparent;
+  --focus: #1f5b86;
+  --selection: rgba(42, 143, 156, 0.22);
+  --primary-bg: linear-gradient(120deg, #1f3d5c, #2a8f9c);
+  --primary-shadow: 0 10px 24px -12px rgba(31, 61, 92, 0.6);
+  --shadow-small: 0 1px 4px -1px rgba(20, 30, 45, 0.14);
+  --shadow-pop: 0 12px 28px -12px rgba(20, 30, 45, 0.25);
+  --shadow-float:
+    0 1px 2px rgba(20, 30, 45, 0.05),
+    0 6px 18px -10px rgba(20, 30, 45, 0.18);
+}
+
+/* Estudio oscuro — el diseño original */
+[data-theme="studio"] {
+  color-scheme: dark;
+  --canvas: #0d0f12;
+  --canvas-deep: #090a0f;
+  --ink: #e8eaf0;
+  --ink-strong: #ffffff;
+  --ink-soft: #a7adbb;
+  --ink-mute: #858b9c;
+  --ink-leaf: #d7dae3;
+  --on-ink: #0d0f12;
+  --on-accent: #0d0f12;
+  --hair: rgba(255, 255, 255, 0.1);
+  --hair-strong: rgba(255, 255, 255, 0.16);
+  --hair-soft: rgba(255, 255, 255, 0.05);
+  --overlay: rgba(255, 255, 255, 0.07);
+  --overlay-soft: rgba(255, 255, 255, 0.025);
+  --glass: rgba(255, 255, 255, 0.045);
+  --glass-strong: rgba(22, 25, 32, 0.72);
+  --surface-solid: #1a1d25;
+  --dock-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015)), rgba(16, 18, 24, 0.78);
+  --segment-bg: rgba(0, 0, 0, 0.3);
+  --pill-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05));
+  --pill-border: rgba(255, 255, 255, 0.16);
+  --pill-ink: #e8eaf0;
+  --node-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02)), rgba(17, 19, 25, 0.62);
+  --node-branch-base: rgba(17, 19, 25, 0.7);
+  --node-leaf-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)), rgba(15, 17, 22, 0.66);
+  --node-root-bg: radial-gradient(120% 140% at 50% 0%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 60%), rgba(20, 22, 30, 0.86);
+  --branch-tint: 16%;
+  --branch-ink-mix: 30%;
+  --root-ink: #e8eaf0;
+  --root-weight: 650;
+  --root-accent: #e8eaf0;
+  --root-ring: conic-gradient(from var(--ring-angle, 0deg), #a78bfa, #22d3ee, #34d399, #fbbf24, #fb7185, #a78bfa);
+  --ring-width: 1.5px;
+  --root-glow: 0 0 60px -16px rgba(167, 139, 250, 0.45);
+  --branch-0: #a78bfa;
+  --branch-1: #34d399;
+  --branch-2: #fbbf24;
+  --branch-3: #22d3ee;
+  --branch-4: #fb7185;
+  --branch-5: #a3e635;
+  --aura-a: rgba(167, 139, 250, 0.09);
+  --aura-b: rgba(34, 211, 238, 0.07);
+  --grid-color: rgba(255, 255, 255, 0.09);
+  --focus: #22d3ee;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --danger: #fb7185;
+  --selection: rgba(167, 139, 250, 0.45);
+  --primary-bg: linear-gradient(180deg, #f3f0ff, #c9b8ff);
+  --primary-ink: #0d0f12;
+  --primary-shadow: 0 8px 28px -10px rgba(167, 139, 250, 0.8);
+  --shadow-small: 0 4px 14px -4px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 12px 30px -10px rgba(0, 0, 0, 0.8);
+  --shadow-float:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.35) inset,
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 12px 28px -10px rgba(0, 0, 0, 0.7),
+    0 30px 60px -30px rgba(0, 0, 0, 0.8);
+}
+
+/* El anillo de la raíz sólo gira en el tema oscuro (es un degradado cónico) */
+:root:not([data-theme="studio"]) .mm-root-ring {
+  animation: none;
+  opacity: 1;
+}
+
+/* Temas claros: el vidrio no aporta sobre fondos claros; superficies sólidas */
+:root:not([data-theme="studio"]) .mm-node,
+:root:not([data-theme="studio"]) .mm-dock {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Lavanda: íconos y bordes de colores, como en la Opción 3 */
+[data-theme="lavender"] .mm-topright .mm-chip:nth-child(1) { border-color: color-mix(in oklab, var(--branch-5) 55%, transparent); }
+[data-theme="lavender"] .mm-topright .mm-chip:nth-child(2) { border-color: color-mix(in oklab, var(--branch-1) 55%, transparent); }
+[data-theme="lavender"] .mm-topright .mm-chip:nth-child(3) { border-color: color-mix(in oklab, var(--branch-2) 55%, transparent); }
+[data-theme="lavender"] .mm-topright .mm-chip:nth-child(4) { border-color: color-mix(in oklab, var(--branch-0) 55%, transparent); }
+[data-theme="lavender"] .mm-topright .mm-chip:nth-child(5) { border-color: color-mix(in oklab, var(--branch-4) 55%, transparent); }
+[data-theme="lavender"] .mm-segment-btn:nth-child(2) svg { color: var(--branch-1); }
+[data-theme="lavender"] .mm-segment-btn:nth-child(3) svg { color: var(--branch-0); }
+[data-theme="lavender"] .mm-dock { border-color: color-mix(in oklab, var(--branch-0) 30%, transparent); }
+[data-theme="grid"] .mm-segment-btn svg,
+[data-theme="grid"] .mm-dock-btn:not(.is-disabled):not(.is-danger) svg { color: var(--branch-1); }
+
+/* ------------------------------------------------------------------ */
+/* Selector de tema                                                   */
+/* ------------------------------------------------------------------ */
+.mm-theme {
+  position: relative;
+}
+.mm-theme-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 244px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--surface-solid);
+  border: 1px solid var(--hair-strong);
+  box-shadow: var(--shadow-pop);
+  z-index: 60;
+}
+.mm-theme-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.mm-theme-option:hover {
+  background: var(--overlay);
+}
+.mm-theme-option[aria-checked="true"] {
+  background: var(--overlay);
+  font-weight: 600;
+}
+.mm-theme-option small {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--ink-mute);
+}
+.mm-theme-swatch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--hair-strong);
+  overflow: hidden;
+}
+.mm-theme-swatch i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 11px;
+  translate: -50% -50%;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+.mm-theme-check {
+  margin-left: auto;
+  color: var(--focus);
+}
+.home-theme {
+  position: absolute;
+  top: 16px;
+  right: max(16px, calc((100% - 828px) / 2));
+}
+.home {
+  position: relative;
+}
+
+@media (max-width: 720px) {
+  .mm-topbar {
+    right: 152px;
+  }
+}
