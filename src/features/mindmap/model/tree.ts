@@ -2,6 +2,10 @@ import type { MindNodeModel } from "./types";
 
 type Nodes = Record<string, MindNodeModel>;
 
+/**
+ * Profundidad de una idea. Una idea flotante cuenta como profundidad 1 (se ve
+ * como una rama principal) y sus hijas siguen desde ahí.
+ */
 export function depthOf(nodes: Nodes, id: string): number {
   let d = 0;
   let cur = nodes[id];
@@ -9,7 +13,27 @@ export function depthOf(nodes: Nodes, id: string): number {
     d++;
     cur = nodes[cur.parentId];
   }
-  return d;
+  return cur?.floating ? d + 1 : d;
+}
+
+/** La idea más alta de la que cuelga (la central o una flotante) */
+export function topOf(nodes: Nodes, id: string): string {
+  let cur = nodes[id];
+  while (cur?.parentId && nodes[cur.parentId]) cur = nodes[cur.parentId];
+  return cur?.id ?? id;
+}
+
+/** Ideas flotantes (sueltas en el lienzo), en orden estable */
+export function floatingRoots(nodes: Nodes, rootId: string): string[] {
+  return Object.values(nodes)
+    .filter((n) => n.parentId === null && n.id !== rootId && n.floating)
+    .map((n) => n.id)
+    .sort();
+}
+
+/** Visibles del mapa completo: la idea central con su árbol y cada flotante con el suyo */
+export function allVisibleIds(nodes: Nodes, rootId: string): string[] {
+  return [rootId, ...floatingRoots(nodes, rootId)].flatMap((r) => visibleIds(nodes, r));
 }
 
 /** Todos los descendientes (incluidos los ocultos por plegado), sin el nodo. */

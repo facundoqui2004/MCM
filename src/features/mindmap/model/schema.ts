@@ -14,6 +14,17 @@ export const mindNodeSchema = z.object({
   color: z.number().int().min(0).max(64),
   collapsed: z.boolean(),
   note: z.string().max(20000).optional(),
+  image: z
+    .object({
+      src: z
+        .string()
+        .max(900_000)
+        .refine((s) => /^data:image\/(webp|jpeg|png);base64,/.test(s), "La imagen tiene que ser webp, jpeg o png"),
+      w: z.number().int().min(1).max(4096),
+      h: z.number().int().min(1).max(4096),
+    })
+    .optional(),
+  floating: z.boolean().optional(),
   x: z.number().finite(),
   y: z.number().finite(),
 });
@@ -41,6 +52,8 @@ export const mindMapDocSchema = z
     if (!root || root.parentId !== null)
       ctx.addIssue({ code: "custom", message: "rootId no apunta a un nodo raíz" });
     for (const n of Object.values(doc.nodes)) {
+      if (n.parentId === null && n.id !== doc.rootId && !n.floating)
+        ctx.addIssue({ code: "custom", message: `El nodo ${n.id} no tiene padre y no es una idea flotante` });
       if (n.parentId !== null && !doc.nodes[n.parentId]?.children.includes(n.id))
         ctx.addIssue({ code: "custom", message: `El nodo ${n.id} no figura entre los hijos de su padre` });
       for (const c of n.children)

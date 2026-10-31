@@ -27,6 +27,9 @@ interface NoteUiState {
   raise: (id: string) => void;
   move: (id: string, pos: XY) => void;
   consumeFocus: (id: string) => void;
+  /** Idea cuya imagen se está viendo en grande */
+  imageId: string | null;
+  openImage: (id: string | null) => void;
 }
 
 const MAX_PINNED = 4;
@@ -61,5 +64,7 @@ export const useNoteUi = create<NoteUiState>()((set, get) => ({
   unpin: (id) => set({ pinned: get().pinned.filter((p) => p.id !== id) }),
   raise: (id) => set({ pinned: get().pinned.map((p) => (p.id === id ? { ...p, z: ++zCounter } : p)) }),
   move: (id, pos) => set({ pinned: get().pinned.map((p) => (p.id === id ? { ...p, pos } : p)) }),
+  imageId: null,
+  openImage: (imageId) => set({ imageId }),
   consumeFocus: (id) => set({ pinned: get().pinned.map((p) => (p.id === id ? { ...p, focusOnOpen: false } : p)) }),
 }));

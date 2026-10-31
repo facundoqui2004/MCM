@@ -34,6 +34,19 @@ export interface NodeSize {
   width: number;
   height: number;
   lines: number;
+  /** Caja de la imagen dentro de la idea (si tiene) */
+  image?: { width: number; height: number };
+}
+
+/** La imagen se muestra a lo sumo de este tamaño dentro de la idea (en el lienzo) */
+export const IMG_MAX_W = 220;
+export const IMG_MAX_H = 170;
+/** margen alrededor de la imagen dentro de la idea */
+export const IMG_PAD = 6;
+
+export function imageBox(img: { w: number; h: number }) {
+  const scale = Math.min(1, IMG_MAX_W / img.w, IMG_MAX_H / img.h);
+  return { width: Math.max(24, Math.round(img.w * scale)), height: Math.max(24, Math.round(img.h * scale)) };
 }
 
 let ctx: CanvasRenderingContext2D | null = null;
@@ -81,7 +94,26 @@ function wrap(text: string, t: NodeTypography): { widest: number; lines: number 
   return { widest: Math.min(widest, MAX_TEXT_WIDTH), lines };
 }
 
-export function measureNode(text: string, depth: number): NodeSize {
+/**
+ * Tamaño de una idea. Con imagen: la imagen va arriba y el texto debajo
+ * (si no hay texto, la idea es sólo la imagen con su margen).
+ */
+export function measureNode(text: string, depth: number, image?: { w: number; h: number }): NodeSize {
+  if (!image) return measureText(text, depth);
+  const b = imageBox(image);
+  if (!text.trim()) {
+    return { width: b.width + IMG_PAD * 2 + 2, height: b.height + IMG_PAD * 2 + 2, lines: 0, image: b };
+  }
+  const t = measureText(text, depth);
+  return {
+    width: Math.max(t.width, b.width + IMG_PAD * 2 + 2),
+    height: t.height + b.height + IMG_PAD,
+    lines: t.lines,
+    image: b,
+  };
+}
+
+function measureText(text: string, depth: number): NodeSize {
   const key = `${Math.min(depth, 2)}|${text}`;
   const hit = cache.get(key);
   if (hit) return hit;

@@ -7,6 +7,8 @@ import {
   ChevronsUpDown,
   CornerDownRight,
   GitFork,
+  ImagePlus,
+  Shapes,
   ListPlus,
   Network,
   Orbit,
@@ -18,10 +20,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { boundsOf } from "../model/geometry";
 import type { LayoutMode } from "../model/types";
-import { visibleIds } from "../model/tree";
+import { allVisibleIds } from "../model/tree";
+import { measureNode } from "../model/measure";
+import { placeImage } from "./mind-map-canvas";
 import { useMindMap } from "../store/mindmap-store";
 import { useNoteUi } from "../store/note-ui-store";
 
@@ -117,12 +121,17 @@ export function Dock() {
   const hasBranches = useMindMap((s) => Object.values(s.nodes).some((n) => n.id !== s.rootId && n.children.length > 0));
   const anyCollapsed = useMindMap((s) => Object.values(s.nodes).some((n) => n.collapsed && n.children.length > 0));
   const s = useMindMap.getState;
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  /** Punto del lienzo (coordenadas del mapa) en una fracción de la pantalla visible */
+  const screenPoint = (fx: number, fy: number) =>
+    rf.screenToFlowPosition({ x: window.innerWidth * fx, y: window.innerHeight * fy });
 
   /** Encuadra usando las posiciones destino del store, no las animadas. */
   const frame = () =>
     requestAnimationFrame(() => {
       const st = s();
-      const b = boundsOf(st.nodes, visibleIds(st.nodes, st.rootId));
+      const b = boundsOf(st.nodes, allVisibleIds(st.nodes, st.rootId));
       rf.fitBounds(b, { padding: 0.28, duration: 520 });
     });
 
@@ -138,6 +147,35 @@ export function Dock() {
         <DockButton icon={CornerDownRight} label="Agregar idea hija" text="Hija" keys="Tab" disabled={!selectedId && "Seleccioná una idea primero"} onClick={() => selectedId && s().addChild(selectedId)} />
         <DockButton icon={ListPlus} label="Agregar idea hermana" text="Hermana" keys="Enter" disabled={!selectedId && "Seleccioná una idea primero"} onClick={() => selectedId && s().addSibling(selectedId)} />
         <DockButton icon={NotebookText} label="Nota de la idea" text="Nota" keys="Ctrl Enter" disabled={!selectedId && "Seleccioná una idea primero"} onClick={() => selectedId && useNoteUi.getState().pin(selectedId)} />
+        <DockButton
+          icon={Shapes}
+          label="Idea suelta (sin conectar)"
+          text="Suelta"
+          keys="Doble clic en el lienzo"
+          onClick={() => {
+            const p = screenPoint(0.3, 0.28);
+            const sz = measureNode("Idea suelta", 1);
+            s().addFloating({ x: p.x - sz.width / 2, y: p.y - sz.height / 2 });
+          }}
+        />
+        <DockButton
+          icon={ImagePlus}
+          label={selectedId ? "Poner una imagen en la idea" : "Agregar una imagen suelta"}
+          text="Imagen"
+          keys="Ctrl V o arrastrar"
+          onClick={() => fileInput.current?.click()}
+        />
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) void placeImage(f, { nodeId: s().selectedId, at: screenPoint(0.5, 0.42) });
+          }}
+        />
         <DockButton icon={Trash2} label="Borrar idea y su rama" keys="Supr" danger disabled={!selectedId ? "Seleccioná una idea primero" : selectedId === rootId && "La idea central no se borra"} onClick={() => selectedId && s().deleteNode(selectedId)} />
       </div>
 

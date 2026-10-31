@@ -16,6 +16,7 @@ import { useMindMap, type SaveStatus } from "../store/mindmap-store";
 import { Dock } from "./dock";
 import { NotePreview } from "./note-preview";
 import { NoteWindows } from "./note-window";
+import { ImageViewer } from "./image-viewer";
 import { ThemePicker } from "@/features/theme/theme-picker";
 import { MindMapCanvas } from "./mind-map-canvas";
 
@@ -45,6 +46,9 @@ const SHORTCUTS: [string, string][] = [
   ["Cursor sobre una idea con nota", "Ver la nota"],
   ["Clic en la vista previa", "Fijarla para escribir"],
   ["Ctrl Enter", "Abrir la nota de la idea"],
+  ["Doble clic en el lienzo vacío", "Idea suelta (flotante)"],
+  ["Ctrl V con una imagen copiada", "Poner la imagen en la idea"],
+  ["Arrastrar una imagen al mapa", "Sobre una idea o suelta"],
   ["Arrastrar un punto de la esquina", "Flecha de relación a otra idea"],
   ["Doble clic en la flecha", "Ponerle nombre"],
   ["Supr con la flecha elegida", "Borrar la relación"],
@@ -445,6 +449,7 @@ export function MindMapEditor({ initial }: { initial: MindMapRecord }) {
         <Dock />
         <NotePreview />
         <NoteWindows />
+        <ImageViewer />
         <input
           ref={fileInput}
           type="file"

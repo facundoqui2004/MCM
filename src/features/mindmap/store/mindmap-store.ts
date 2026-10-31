@@ -7,8 +7,8 @@ import { createNode } from "../model/factory";
 import { applyPositions, computeLayout } from "../model/layout";
 import { measureNode } from "../model/measure";
 import { BRANCH_COUNT } from "../model/palette";
-import { depthOf, descendantsOf, visibleChildren } from "../model/tree";
-import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, Relation, Side, XY } from "../model/types";
+import { depthOf, descendantsOf, floatingRoots, visibleChildren } from "../model/tree";
+import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, NodeImage, Relation, Side, XY } from "../model/types";
 
 type Nodes = Record<string, MindNodeModel>;
 
@@ -79,6 +79,14 @@ export interface MindMapState extends Snapshot {
   notify: (text: string) => void;
   dismissNotice: () => void;
 
+  /**
+   * Crea una idea flotante (suelta, sin conectar al árbol) con su esquina en `pos`
+   * (coordenadas del lienzo). Si trae imagen, nace sin texto.
+   */
+  addFloating: (pos: XY, opts?: { image?: NodeImage }) => string;
+  /** Pone o quita (null) la imagen de una idea */
+  setImage: (id: string, image: NodeImage | null) => boolean;
+
   /** Crea una flecha de relación (si ya existe entre esas dos ideas, la selecciona) */
   addRelation: (from: string, to: string) => string | null;
   selectRelation: (id: string | null) => void;
@@ -102,6 +110,8 @@ export interface MindMapState extends Snapshot {
 }
 
 const HISTORY_LIMIT = 120;
+/** Tope de imágenes por mapa (en caracteres de data URL): el mapa se guarda entero en cada autoguardado */
+const IMAGES_BUDGET = 3_600_000;
 
 const snap = (s: Snapshot): Snapshot => ({
   nodes: s.nodes,
@@ -145,14 +155,14 @@ function freePlacement(nodes: Nodes, parentId: string, newId: string, rootId: st
   const parent = nodes[parentId];
   const child = nodes[newId];
   const pd = depthOf(nodes, parentId);
-  const ps = measureNode(parent.text, pd);
-  const cs = measureNode(child.text, pd + 1);
+  const ps = measureNode(parent.text, pd, parent.image);
+  const cs = measureNode(child.text, pd + 1, child.image);
   const siblings = parent.children.filter((c) => c !== newId && nodes[c].side === child.side);
   const gap = parentId === rootId ? 84 : 52;
   const x = child.side === "right" ? parent.x + ps.width + gap : parent.x - gap - cs.width;
   if (!siblings.length) return { x, y: parent.y + ps.height / 2 - cs.height / 2 };
   const last = nodes[siblings[siblings.length - 1]];
-  const ls = measureNode(last.text, pd + 1);
+  const ls = measureNode(last.text, pd + 1, last.image);
   return { x, y: last.y + ls.height + 14 };
 }
 
@@ -253,7 +263,8 @@ export const useMindMap = create<MindMapState>()(
         const s = get();
         const n = s.nodes[id];
         set({ editingId: null, editSeed: null, editDraft: null });
-        const text = raw.trim() || n?.text || "Nueva idea";
+        // una idea con imagen puede quedar sin texto (sólo la imagen)
+        const text = raw.trim() || (n?.image ? "" : n?.text || "Nueva idea");
         if (!n || n.text === text) return;
         // El título del mapa sigue a la idea central mientras nadie lo haya editado a mano
         // (si todavía coincide con el texto anterior de la raíz, se considera "no tocado").
@@ -300,7 +311,9 @@ export const useMindMap = create<MindMapState>()(
         const node = s.nodes[id];
         if (!node.parentId) return get().addChild(id, undefined, edit);
         const parent = s.nodes[node.parentId];
-        const sib = createNode({ parentId: parent.id, side: node.side, color: node.color });
+        // una rama principal nueva (hermana directa bajo la idea central) estrena color
+        const color = parent.id === s.rootId ? parent.children.length % BRANCH_COUNT : node.color;
+        const sib = createNode({ parentId: parent.id, side: node.side, color });
         const idx = parent.children.indexOf(id) + (where === "after" ? 1 : 0);
         const children = [...parent.children];
         children.splice(idx, 0, sib.id);
@@ -309,7 +322,7 @@ export const useMindMap = create<MindMapState>()(
           nodes[sib.id] = { ...sib, x: node.x, y: node.y };
           nodes = relaid(s, nodes);
         } else {
-          const ns = measureNode(node.text, depthOf(s.nodes, id));
+          const ns = measureNode(node.text, depthOf(s.nodes, id), node.image);
           const dy = where === "after" ? ns.height + 14 : -(ns.height + 14);
           nodes[sib.id] = { ...sib, x: node.x, y: node.y + dy };
         }
@@ -320,7 +333,22 @@ export const useMindMap = create<MindMapState>()(
       deleteNode: (id) => {
         const s = get();
         const node = s.nodes[id];
-        if (!node || !node.parentId) return; // la raíz no se borra
+        if (!node || id === s.rootId) return; // la raíz no se borra
+        if (!node.parentId) {
+          // idea flotante: se va con toda su rama
+          const nodes: Nodes = { ...s.nodes };
+          const gone = descendantsOf(s.nodes, id);
+          for (const d of [id, ...gone]) delete nodes[d];
+          commit({
+            nodes: settle(nodes),
+            relations: liveRelations(s.relations, nodes),
+            selectedId: s.rootId,
+            editingId: null,
+            editDraft: null,
+            lastDeleted: { text: node.text || "Imagen", descendants: gone.length, stamp: Date.now() },
+          });
+          return;
+        }
         const parent = s.nodes[node.parentId];
         const idx = parent.children.indexOf(id);
         const nextSel = parent.children[idx + 1] ?? parent.children[idx - 1] ?? parent.id;
@@ -333,7 +361,7 @@ export const useMindMap = create<MindMapState>()(
           selectedId: nextSel,
           editingId: null,
           editDraft: null,
-          lastDeleted: { text: node.text, descendants: gone.length, stamp: Date.now() },
+          lastDeleted: { text: node.text || "Imagen", descendants: gone.length, stamp: Date.now() },
         });
       },
       dismissDeleted: () => set({ lastDeleted: null }),
@@ -393,6 +421,7 @@ export const useMindMap = create<MindMapState>()(
           else n.children.forEach((c) => walk(c, d + 1));
         };
         walk(s.rootId, 0);
+        for (const f of floatingRoots(s.nodes, s.rootId)) walk(f, 1);
         if (!visibleCollapsed.length) return;
         const shallowest = Math.min(...visibleCollapsed.map((v) => v.depth));
         const nodes: Nodes = { ...s.nodes };
@@ -418,6 +447,55 @@ export const useMindMap = create<MindMapState>()(
 
       notify: (text) => set({ notice: { text, stamp: Date.now() } }),
       dismissNotice: () => set({ notice: null }),
+
+      addFloating: (pos, opts = {}) => {
+        const s = get();
+        const count = floatingRoots(s.nodes, s.rootId).length;
+        const root = s.nodes[s.rootId];
+        const node = createNode({
+          parentId: null,
+          floating: true,
+          side: "right",
+          // color propio, siguiendo la paleta de las ramas
+          color: (root.children.length + count) % BRANCH_COUNT,
+          text: opts.image ? "" : "Idea suelta",
+          ...(opts.image ? { image: opts.image } : null),
+          x: Math.round(pos.x),
+          y: Math.round(pos.y),
+        });
+        const edit = !opts.image;
+        commit({
+          nodes: { ...s.nodes, [node.id]: node },
+          selectedId: node.id,
+          selectedRelationId: null,
+          editingRelationId: null,
+          editingId: edit ? node.id : null,
+          editSeed: null,
+          editDraft: edit ? node.text : null,
+        });
+        return node.id;
+      },
+
+      setImage: (id, image) => {
+        const s = get();
+        const n = s.nodes[id];
+        if (!n) return false;
+        if (image) {
+          const used = Object.values(s.nodes).reduce((acc, m) => acc + (m.id === id ? 0 : (m.image?.src.length ?? 0)), 0);
+          if (used + image.src.length > IMAGES_BUDGET) {
+            s.notify("El mapa ya tiene demasiadas imágenes. Quitá alguna para agregar otra");
+            return false;
+          }
+        }
+        const next: MindNodeModel = { ...n };
+        if (image) next.image = image;
+        else {
+          delete next.image;
+          if (!next.text.trim()) next.text = "Nueva idea";
+        }
+        commit({ nodes: settle({ ...s.nodes, [id]: next }) });
+        return true;
+      },
 
       addRelation: (from, to) => {
         const s = get();
@@ -472,7 +550,9 @@ export const useMindMap = create<MindMapState>()(
           const dn = nodes[d];
           nodes[d] = { ...dn, x: dn.x + dx, y: dn.y + dy };
         }
-        set({ nodes, autoLayout: false });
+        // Mover una idea flotante es elegir su lugar: el resto del mapa sigue ordenándose solo.
+        // Mover cualquier otra idea pasa el mapa a modo libre.
+        set(n.floating && !n.parentId ? { nodes } : { nodes, autoLayout: false });
       },
       endDrag: () => commit({ dragging: false }, { history: false }),
 
@@ -498,7 +578,7 @@ export const useMindMap = create<MindMapState>()(
         const n = s.nodes[id];
         if (!n) return;
         const center = (m: MindNodeModel) => {
-          const sz = measureNode(m.text, depthOf(s.nodes, m.id));
+          const sz = measureNode(m.text, depthOf(s.nodes, m.id), m.image);
           return { x: m.x + sz.width / 2, y: m.y + sz.height / 2 };
         };
         const c = center(n);

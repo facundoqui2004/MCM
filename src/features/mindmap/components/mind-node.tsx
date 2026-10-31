@@ -1,11 +1,11 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, NotebookText } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Maximize2, Minus, NotebookText, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { outwardOf, siblingAxis } from "../model/geometry";
-import { measureNode, typographyFor } from "../model/measure";
+import { IMG_PAD, measureNode, typographyFor } from "../model/measure";
 import { accentOf } from "../model/palette";
 import { depthOf, descendantsOf } from "../model/tree";
 import type { Direction } from "../model/types";
@@ -83,7 +83,7 @@ function QuickAdd({ dir, gap, label, onClick, kind }: { dir: Direction; gap: num
   );
 }
 
-function NodeEditor({ id, seed, depth }: { id: string; seed: string | null; depth: number }) {
+function NodeEditor({ id, seed, depth, top }: { id: string; seed: string | null; depth: number; top: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const draft = useMindMap((s) => s.editDraft ?? "");
   const setDraft = useMindMap((s) => s.setDraft);
@@ -139,7 +139,8 @@ function NodeEditor({ id, seed, depth }: { id: string; seed: string | null; dept
       spellCheck={false}
       aria-label="Texto del nodo"
       className="mm-editor nodrag nopan nowheel"
-      style={{ fontFamily: t.fontFamily, fontSize: t.fontSize, fontWeight: t.fontWeight, lineHeight: `${t.lineHeight}px`, padding: `${t.padY}px ${t.padX}px` }}
+      placeholder={top ? "Texto (opcional)" : undefined}
+      style={{ ...(top ? { top, height: `calc(100% - ${top}px)` } : null), fontFamily: t.fontFamily, fontSize: t.fontSize, fontWeight: t.fontWeight, lineHeight: `${t.lineHeight}px`, padding: `${t.padY}px ${t.padX}px` }}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => finish("commit")}
       onKeyDown={(e) => {
@@ -174,13 +175,31 @@ function MindNodeImpl({ id }: NodeProps) {
   useMindMap((s) => s.fontEpoch); // re-render cuando cambian las medidas
   const draft = useMindMap((s) => (s.editingId === id ? s.editDraft : null));
   const [hover, setHover] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  // Si la idea se mueve (animación de layout) y deja de estar bajo el cursor, el
+  // navegador no avisa "mouseleave": se verifica con el próximo movimiento del mouse.
+  useEffect(() => {
+    if (!hover) return;
+    const check = (e: PointerEvent) => {
+      const el = wrapRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setHover(false);
+        if (useNoteUi.getState().hoverId === id) useNoteUi.getState().setHover(null);
+      }
+    };
+    window.addEventListener("pointermove", check, { passive: true });
+    return () => window.removeEventListener("pointermove", check);
+  }, [hover, id]);
 
   if (!node) return null;
 
   const accent = accentOf(node.color, isRoot);
   const t = typographyFor(depth);
-  const committed = measureNode(node.text, depth);
-  const size = draft === null ? committed : measureNode(draft, depth);
+  const committed = measureNode(node.text, depth, node.image);
+  // al escribir en una idea con imagen siempre hay lugar para el texto, aunque esté vacío
+  const size = draft === null ? committed : measureNode(node.image && !draft.trim() ? "Mm" : draft, depth, node.image);
+  const imgTop = size.image ? size.image.height + IMG_PAD : 0;
+  const isFloatingRoot = !!node.floating && !node.parentId;
   // Mientras se edita, el nodo crece alejándose de su padre (y centrado en el eje
   // perpendicular), para no tapar la rama de la que cuelga.
   const dw = size.width - committed.width;
@@ -199,6 +218,7 @@ function MindNodeImpl({ id }: NodeProps) {
 
   return (
     <div
+      ref={wrapRef}
       className="relative"
       style={{ ["--accent" as string]: accent }}
       onMouseEnter={() => {
@@ -236,16 +256,55 @@ function MindNodeImpl({ id }: NodeProps) {
           // márgenes compensatorios: la caja externa conserva el tamaño confirmado
           marginRight: -(dw + growX),
           marginBottom: -(dh + growY),
-          borderRadius: isRoot ? 999 : multiline ? 18 : 999,
+          borderRadius: node.image ? 16 : isRoot ? 999 : multiline ? 18 : 999,
         }}
         initial={{ scale: 0.55, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 420, damping: 24 }}
       >
         {isRoot && <span className="mm-root-ring" aria-hidden />}
+        {node.image && size.image && (
+          <div
+            className="mm-node-img"
+            style={{ width: size.image.width, height: size.image.height, margin: `${IMG_PAD}px auto 0` }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- data URL guardada en el mapa */}
+            <img src={node.image.src} alt={node.text ? `Imagen de ${node.text}` : "Imagen de la idea"} draggable={false} />
+            {selected && !editing && (
+              <div className="mm-img-tools">
+                <button
+                  type="button"
+                  className="mm-img-btn nodrag nopan"
+                  aria-label="Ver la imagen en grande"
+                  title="Ver en grande"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useNoteUi.getState().openImage(id);
+                  }}
+                >
+                  <Maximize2 size={12} />
+                </button>
+                <button
+                  type="button"
+                  className="mm-img-btn nodrag nopan"
+                  aria-label="Quitar la imagen"
+                  title="Quitar imagen (Ctrl Z la recupera)"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    s().setImage(id, null);
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {editing ? (
-          <NodeEditor id={id} seed={editSeed} depth={depth} />
-        ) : (
+          <NodeEditor id={id} seed={editSeed} depth={depth} top={imgTop} />
+        ) : node.image && !node.text.trim() ? null : (
           <div
             className="mm-label"
             style={{ fontFamily: t.fontFamily, fontSize: t.fontSize, fontWeight: t.fontWeight, lineHeight: `${t.lineHeight}px`, padding: `${t.padY}px ${t.padX}px` }}
@@ -309,7 +368,7 @@ function MindNodeImpl({ id }: NodeProps) {
             ) : (
               <QuickAdd key="c" dir={outward} gap={hasChildren && !isRoot ? 22 : 14} kind="child" label="Agregar idea hija (Tab)" onClick={() => s().addChild(id)} />
             )}
-            {!isRoot && (
+            {!isRoot && !isFloatingRoot && (
               <>
                 <QuickAdd key="b" dir={sib.before} gap={6} kind="sibling" label="Agregar idea hermana antes (Shift+Enter)" onClick={() => s().addSibling(id, "before")} />
                 <QuickAdd key="a" dir={sib.after} gap={6} kind="sibling" label="Agregar idea hermana (Enter)" onClick={() => s().addSibling(id, "after")} />

@@ -19,6 +19,15 @@ export interface XY {
   y: number;
 }
 
+/** Imagen de una idea: ya comprimida en el navegador y guardada dentro del mapa */
+export interface NodeImage {
+  /** data URL (webp o jpeg) */
+  src: string;
+  /** tamaño en píxeles de la imagen guardada */
+  w: number;
+  h: number;
+}
+
 export interface MindNodeModel {
   id: string;
   parentId: string | null;
@@ -35,6 +44,13 @@ export interface MindNodeModel {
    * y se edita en una ventana fijada. Los mapas viejos no la tienen.
    */
   note?: string;
+  /** Imagen que se muestra arriba del texto (opcional) */
+  image?: NodeImage;
+  /**
+   * Idea flotante: suelta en el lienzo, sin padre (parentId null) pero no es la
+   * idea central. Puede tener sus propias hijas; su posición la elige el usuario.
+   */
+  floating?: boolean;
   /** Esquina superior izquierda en coordenadas del lienzo */
   x: number;
   y: number;

@@ -1,12 +1,12 @@
 import dagre from "@dagrejs/dagre";
 import { measureNode } from "./measure";
-import { depthOf, visibleChildren, visibleIds } from "./tree";
+import { depthOf, floatingRoots, visibleChildren, visibleIds } from "./tree";
 import type { LayoutMode, MindNodeModel, XY } from "./types";
 
 type Nodes = Record<string, MindNodeModel>;
 export type Positions = Record<string, XY>;
 
-const sizeOf = (nodes: Nodes, id: string, depth: number) => measureNode(nodes[id].text, depth);
+const sizeOf = (nodes: Nodes, id: string, depth: number) => measureNode(nodes[id].text, depth, nodes[id].image);
 
 /* ------------------------------------------------------------------------ */
 /* Layout bilateral (estilo XMind): "tidy tree" propio, determinista y que   */
@@ -18,7 +18,7 @@ const H_GAP_ROOT = 84;
 const H_GAP = 52;
 const V_GAP = 14;
 
-function layoutBilateral(nodes: Nodes, rootId: string): Positions {
+function layoutBilateral(nodes: Nodes, rootId: string, baseDepth = 0): Positions {
   const pos: Positions = {};
   const heightCache = new Map<string, number>();
 
@@ -53,9 +53,14 @@ function layoutBilateral(nodes: Nodes, rootId: string): Positions {
     }
   };
 
-  const rs = sizeOf(nodes, rootId, 0);
+  const rs = sizeOf(nodes, rootId, baseDepth);
   pos[rootId] = { x: -rs.width / 2, y: -rs.height / 2 };
   const kids = visibleChildren(nodes, rootId);
+  if (baseDepth > 0) {
+    // idea flotante: toda su rama crece hacia la derecha, como una rama principal
+    placeChildren(rootId, kids, baseDepth, 1);
+    return pos;
+  }
   placeChildren(rootId, kids.filter((k) => nodes[k].side === "right"), 0, 1);
   placeChildren(rootId, kids.filter((k) => nodes[k].side === "left"), 0, -1);
   return pos;
@@ -75,7 +80,7 @@ function layoutBilateral(nodes: Nodes, rootId: string): Positions {
 const TREE_H_GAP = 20;
 const TREE_V_GAP = 60;
 
-function layoutVerticalTree(nodes: Nodes, rootId: string): Positions {
+function layoutVerticalTree(nodes: Nodes, rootId: string, baseDepth = 0): Positions {
   const pos: Positions = {};
   const widthCache = new Map<string, number>();
 
@@ -92,16 +97,19 @@ function layoutVerticalTree(nodes: Nodes, rootId: string): Positions {
 
   // y de cada nivel = suma de las alturas máximas de los niveles anteriores
   const levelHeight: number[] = [];
+  // (los niveles se cuentan desde la raíz de este árbol: la central o una flotante)
   for (const id of visibleIds(nodes, rootId)) {
     const d = depthOf(nodes, id);
-    levelHeight[d] = Math.max(levelHeight[d] ?? 0, sizeOf(nodes, id, d).height);
+    const lv = d - baseDepth;
+    levelHeight[lv] = Math.max(levelHeight[lv] ?? 0, sizeOf(nodes, id, d).height);
   }
   const levelY: number[] = [0];
   for (let d = 1; d < levelHeight.length; d++) levelY[d] = levelY[d - 1] + levelHeight[d - 1] + TREE_V_GAP;
 
   const place = (id: string, depth: number, centerX: number) => {
     const s = sizeOf(nodes, id, depth);
-    pos[id] = { x: centerX - s.width / 2, y: levelY[depth] + (levelHeight[depth] - s.height) / 2 };
+    const lv = depth - baseDepth;
+    pos[id] = { x: centerX - s.width / 2, y: levelY[lv] + (levelHeight[lv] - s.height) / 2 };
     const kids = visibleChildren(nodes, id);
     const total = kids.reduce((acc, k) => acc + subtreeWidth(k, depth + 1), 0) + (kids.length - 1) * TREE_H_GAP;
     let cursor = centerX - total / 2;
@@ -111,9 +119,9 @@ function layoutVerticalTree(nodes: Nodes, rootId: string): Positions {
       cursor += w + TREE_H_GAP;
     }
   };
-  place(rootId, 0, 0);
+  place(rootId, baseDepth, 0);
   const r = pos[rootId];
-  const rs = sizeOf(nodes, rootId, 0);
+  const rs = sizeOf(nodes, rootId, baseDepth);
   // centramos en la raíz para que cambiar de layout no "salte" el lienzo
   const oy = r.y + rs.height / 2;
   for (const id of Object.keys(pos)) pos[id] = { x: pos[id].x, y: pos[id].y - oy };
@@ -201,10 +209,27 @@ function layoutRadial(nodes: Nodes, rootId: string): Positions {
   return pos;
 }
 
-export function computeLayout(nodes: Nodes, rootId: string, mode: LayoutMode): Positions {
+function layoutMain(nodes: Nodes, rootId: string, mode: LayoutMode): Positions {
   if (mode === "tree") return layoutVerticalTree(nodes, rootId);
   if (mode === "radial") return layoutRadial(nodes, rootId);
   return layoutBilateral(nodes, rootId);
+}
+
+/**
+ * Layout completo: el árbol de la idea central y, por separado, el de cada idea
+ * flotante. Una flotante no se mueve (su lugar lo eligió el usuario): sólo se
+ * ordenan sus hijas alrededor de ella.
+ */
+export function computeLayout(nodes: Nodes, rootId: string, mode: LayoutMode): Positions {
+  const pos = layoutMain(nodes, rootId, mode);
+  for (const f of floatingRoots(nodes, rootId)) {
+    const sub = mode === "tree" ? layoutVerticalTree(nodes, f, 1) : layoutBilateral(nodes, f, 1);
+    const anchor = sub[f];
+    const dx = nodes[f].x - anchor.x;
+    const dy = nodes[f].y - anchor.y;
+    for (const [id, p] of Object.entries(sub)) pos[id] = { x: p.x + dx, y: p.y + dy };
+  }
+  return pos;
 }
 
 /** Aplica posiciones devolviendo un nuevo diccionario (sólo copia lo que cambió). */

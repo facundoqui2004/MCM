@@ -1,12 +1,12 @@
 import { measureNode } from "./measure";
-import { depthOf } from "./tree";
+import { depthOf, topOf } from "./tree";
 import type { Direction, LayoutMode, MindNodeModel } from "./types";
 
 type Nodes = Record<string, MindNodeModel>;
 
 export function centerOf(nodes: Nodes, id: string) {
   const n = nodes[id];
-  const s = measureNode(n.text, depthOf(nodes, id));
+  const s = measureNode(n.text, depthOf(nodes, id), n.image);
   return { x: n.x + s.width / 2, y: n.y + s.height / 2, width: s.width, height: s.height };
 }
 
@@ -17,6 +17,8 @@ export function centerOf(nodes: Nodes, id: string) {
 export function outwardOf(nodes: Nodes, rootId: string, id: string, mode: LayoutMode): Direction {
   if (mode === "tree") return "bottom";
   if (id === rootId) return "right";
+  // las flotantes crecen hacia la derecha en mapa y radial (se ubican a mano)
+  if (nodes[topOf(nodes, id)]?.floating) return "right";
   if (mode === "map") return nodes[id].side;
   const c = centerOf(nodes, id);
   const r = centerOf(nodes, rootId);
