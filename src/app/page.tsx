@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CopyToDriveButton, DeleteMapButton, NewMapButtons } from "@/components/map-list-actions";
 import { AccountBar, LoginHero } from "@/components/account";
+import { LegalFooter } from "@/components/legal-footer";
 import type { MindMapSummary } from "@/features/mindmap/model/types";
 import { googleEnabled, loginRequired } from "@/server/auth/config";
 import { AuthExpiredError, publicUser } from "@/server/auth/session";
@@ -55,6 +56,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       <main className="home">
         <ThemePicker className="home-theme" />
         <LoginHero notice={notice} />
+        <LegalFooter />
       </main>
     );
   }
@@ -120,6 +122,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
           </ul>
         </section>
       )}
+      <LegalFooter />
     </main>
   );
 }
