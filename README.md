@@ -16,9 +16,22 @@ Editor de mapas mentales en el navegador, pensado para **estudiar y repasar**. A
 | ↗️ | **Flechas de relación con nombre** entre dos ideas cualesquiera, aunque estén en ramas distintas |
 | 🖼️ | **Imágenes dentro de las ideas**: botón, `Ctrl V` o arrastrar un archivo |
 | 🫧 | **Ideas sueltas (flotantes)** que no cuelgan de la idea central y pueden tener su propia rama |
+| ☁️ | **Iniciar sesión con Google**: tus mapas se guardan en tu propio Google Drive |
 | 🎨 | Cada rama principal estrena color, también cuando se crea con `Enter` |
 
 ## Funciones
+
+### Tus mapas en tu Google Drive
+
+Con **Iniciar sesión con Google**, cada mapa se guarda como un archivo `.mindmap.json` en una carpeta **Mindmap Studio** de tu Drive. Así los tenés en cualquier compu y son solo tuyos.
+
+- La app pide solo el permiso `drive.file`, así que **ve únicamente los archivos que ella misma crea**, nunca el resto de tu Drive.
+- El guardado sigue siendo automático. Si cambiás el título, el archivo se renombra solo; si borrás un mapa, va a la papelera de Drive y se puede recuperar.
+- Si la sesión de Google vence en medio de la edición, aparece **Volver a entrar**: se abre una ventanita de Google y, al volver, se guarda lo que hiciste. No se pierde nada.
+- Los mapas que hiciste antes sin cuenta aparecen aparte, con un botón **Copiar a mi Drive**.
+- El archivo tiene el mismo formato que *Exportar*: lo podés descargar de Drive e importarlo donde quieras.
+
+Sin iniciar sesión, la app funciona como antes y guarda en la base de datos del sitio.
 
 ### Teclado primero
 
@@ -141,6 +154,7 @@ Cinco temas: **Papel** (el principal), **Cuaderno**, **Lavanda**, **Minimal** y 
 | Estilos | Tailwind CSS 4 + variables CSS por tema |
 | Datos | Drizzle ORM + libSQL (SQLite local, [Turso](https://turso.tech) en producción) |
 | Validación | Zod, el mismo esquema en cliente y servidor |
+| Cuentas y archivos | Google OAuth 2.0 + Google Drive API v3 (permiso `drive.file`) |
 | Hosting | Vercel |
 
 ## Correrlo en tu computadora
@@ -164,9 +178,27 @@ Vercel no guarda archivos entre despliegues, así que en producción la base va 
 
 Si falta la base, la app muestra un error que dice qué variable configurar.
 
+## Guardar en Google Drive (configuración)
+
+Hace falta una vez, en [Google Cloud Console](https://console.cloud.google.com/):
+
+1. **Crear un proyecto** (por ejemplo "Mindmap Studio").
+2. **Activar la API de Google Drive:** *APIs y servicios → Biblioteca → Google Drive API → Habilitar*.
+3. **Pantalla de consentimiento de OAuth:** tipo *Externo*, con nombre de la app, tu email y los permisos `openid`, `email`, `profile` y `.../auth/drive.file`. Después, **Publicar la app** (pasarla a *En producción*). En modo *Prueba* solo pueden entrar los emails cargados como testers y la sesión vence cada 7 días.
+4. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**, con estos *URI de redireccionamiento autorizados*:
+   - `https://mcm-xi.vercel.app/api/auth/google/callback`
+   - `http://localhost:3000/api/auth/google/callback` (para probar en tu compu)
+5. **Variables de entorno** (en Vercel: *Settings → Environment Variables*; en tu compu: `.env.local`):
+   - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`: los del paso 4.
+   - `AUTH_SECRET`: un texto largo al azar (cifra la cookie de sesión).
+   - Opcional: `MAPS_REQUIRE_LOGIN=1` para que sin cuenta no se pueda usar la app.
+6. Volver a desplegar.
+
+La sesión vive en una cookie cifrada (AES-256-GCM) que el navegador no puede leer, y dura 180 días. No hay tabla de usuarios: la app no guarda datos de las personas en su base.
+
 ## Cómo se guarda un mapa
 
-Cada mapa es un documento JSON validado con Zod, en una sola fila de la base. Los campos nuevos son opcionales, así que los mapas viejos se siguen abriendo igual.
+Cada mapa es un documento JSON validado con Zod: una fila de la base del sitio, o un archivo `.mindmap.json` en el Drive del usuario. Los campos nuevos son opcionales, así que los mapas viejos se siguen abriendo igual.
 
 ```jsonc
 {
@@ -193,7 +225,7 @@ Cada mapa es un documento JSON validado con Zod, en una sola fila de la base. Lo
 
 ```
 src/
-├─ app/                      páginas y API (/api/maps)
+├─ app/                      páginas y API (/api/maps, /api/auth/google)
 ├─ features/
 │  ├─ mindmap/
 │  │  ├─ model/              dominio puro: árbol, layouts, medición, esquema Zod,
@@ -203,7 +235,11 @@ src/
 │  │  └─ components/         lienzo, nodo, ramas, flechas de relación,
 │  │                         notas (vista previa y ventana), visor de imágenes, barra
 │  └─ theme/                 temas y selector
-└─ server/                   base de datos (Drizzle) y repositorio
+├─ components/               lista de mapas y cuenta de Google
+└─ server/
+   ├─ auth/                  inicio de sesión con Google y cookie cifrada
+   ├─ db/                    base de datos del sitio (Drizzle)
+   └─ maps/                  repositorios: base del sitio o Google Drive, según la sesión
 ```
 
 ## API
@@ -213,8 +249,11 @@ src/
 | GET | `/api/maps` | Lista de mapas |
 | POST | `/api/maps` | Crear o importar un mapa |
 | GET | `/api/maps/:id` | Leer un mapa |
-| PUT | `/api/maps/:id` | Guardar (con control de versión: `409` si otra pestaña guardó antes) |
-| DELETE | `/api/maps/:id` | Borrar |
+| PUT | `/api/maps/:id` | Guardar (con control de versión: `409` si otra pestaña guardó antes; `401` si venció la sesión de Google) |
+| DELETE | `/api/maps/:id` | Borrar (en Drive, a la papelera) |
+| POST | `/api/maps/:id/to-drive` | Copiar un mapa del sitio a tu Drive |
+| GET | `/api/auth/google/login` | Iniciar sesión con Google |
+| POST | `/api/auth/logout` | Cerrar sesión |
 | GET | `/api/maps/:id/export` | Descargar el `.mindmap.json` |
 
 ## Diseño

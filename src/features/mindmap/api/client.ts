@@ -6,7 +6,14 @@ export class ConflictError extends Error {
   }
 }
 
+/** La sesión de Google venció: hay que volver a iniciar sesión (lo que hay en pantalla no se pierde) */
+export class AuthError extends Error {}
+
 async function json<T>(res: Response): Promise<T> {
+  if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
+    throw new AuthError(body.error ?? "Iniciá sesión de nuevo");
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `Error ${res.status}`);

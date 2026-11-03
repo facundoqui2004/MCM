@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { CloudUpload, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -56,7 +56,7 @@ export function NewMapButtons({ showSample }: { showSample: boolean }) {
   );
 }
 
-export function DeleteMapButton({ id, title }: { id: string; title: string }) {
+export function DeleteMapButton({ id, title, toTrash = false }: { id: string; title: string; toTrash?: boolean }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   return (
@@ -64,6 +64,7 @@ export function DeleteMapButton({ id, title }: { id: string; title: string }) {
       type="button"
       className={`home-delete ${confirming ? "is-confirming" : ""}`}
       aria-label={confirming ? `Confirmar borrado de ${title}` : `Borrar ${title}`}
+      title={toTrash ? "Va a la papelera de tu Google Drive (se puede recuperar desde ahí)" : undefined}
       onBlur={() => setConfirming(false)}
       onClick={async (e) => {
         e.preventDefault();
@@ -74,6 +75,34 @@ export function DeleteMapButton({ id, title }: { id: string; title: string }) {
     >
       <Trash2 size={14} />
       {confirming && <span>Borrar</span>}
+    </button>
+  );
+}
+
+/** Copia un mapa guardado en el sitio (sin cuenta) al Google Drive del usuario y lo abre */
+export function CopyToDriveButton({ id, title }: { id: string; title: string }) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  return (
+    <button
+      type="button"
+      className={`home-copy ${state === "error" ? "is-error" : ""}`}
+      aria-label={`Copiar ${title} a mi Google Drive`}
+      disabled={state === "busy"}
+      onClick={async () => {
+        setState("busy");
+        try {
+          const res = await fetch(`/api/maps/${id}/to-drive`, { method: "POST" });
+          if (!res.ok) throw new Error();
+          const { id: newId } = (await res.json()) as { id: string };
+          router.push(`/map/${newId}`);
+        } catch {
+          setState("error");
+        }
+      }}
+    >
+      {state === "busy" ? <Loader2 size={14} className="animate-spin" /> : <CloudUpload size={14} />}
+      <span>{state === "error" ? "No se pudo, reintentar" : "Copiar a mi Drive"}</span>
     </button>
   );
 }

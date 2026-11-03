@@ -20,7 +20,7 @@ interface Snapshot {
   relations: Relation[];
 }
 
-export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error" | "conflict";
+export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error" | "conflict" | "auth";
 
 export interface MindMapState extends Snapshot {
   mapId: string | null;

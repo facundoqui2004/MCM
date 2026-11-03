@@ -27,7 +27,23 @@ const STATUS_COPY: Record<SaveStatus, string> = {
   saved: "Guardado",
   error: "Sin conexión con el servidor. Tus cambios siguen acá y se reintenta solo",
   conflict: "Este mapa cambió en otra pestaña. Lo tuyo sigue en pantalla",
+  auth: "Sesión de Google vencida. Lo tuyo sigue acá",
 };
+
+/** Abre el inicio de sesión de Google en una ventanita, para no salir del mapa */
+function reLogin() {
+  const w = 480;
+  const h = 640;
+  const left = window.screenX + (window.outerWidth - w) / 2;
+  const top = window.screenY + (window.outerHeight - h) / 2;
+  const popup = window.open(
+    `/api/auth/google/login?popup=1&returnTo=${encodeURIComponent(window.location.pathname)}`,
+    "mm-login",
+    `width=${w},height=${h},left=${left},top=${top}`,
+  );
+  // si el navegador bloqueó la ventanita, se va a la página de Google en esta pestaña
+  if (!popup) window.location.href = `/api/auth/google/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+}
 
 const SHORTCUTS: [string, string][] = [
   ["Tab", "Idea hija"],
@@ -73,14 +89,25 @@ function TitleField() {
   );
 }
 
-function SaveIndicator({ onRetry, onKeepMine }: { onRetry: () => void; onKeepMine: () => void }) {
+function SaveIndicator({ onRetry, onKeepMine, drive }: { onRetry: () => void; onKeepMine: () => void; drive: boolean }) {
   const status = useMindMap((s) => s.saveStatus);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   if (status === "idle") return null;
+  const text = drive && status === "saved" ? "Guardado en tu Drive" : STATUS_COPY[status];
   return (
     <span className={`mm-status is-${status}`} role="status">
       <i aria-hidden />
-      <span className="mm-status-text" title={STATUS_COPY[status]}>{STATUS_COPY[status]}</span>
+      <span className="mm-status-text" title={text}>{text}</span>
+      {status === "auth" && (
+        <button
+          type="button"
+          className="mm-status-action is-primary"
+          title="Abre Google en una ventanita para volver a iniciar sesión. Después se guarda solo lo que hiciste"
+          onClick={reLogin}
+        >
+          Volver a entrar
+        </button>
+      )}
       {status === "error" && (
         <button type="button" className="mm-status-action" onClick={onRetry}>
           Reintentar ahora
@@ -319,7 +346,8 @@ export function MindMapEditor({ initial }: { initial: MindMapRecord }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const { saveNow } = useAutosave();
+  const drive = initial.storage === "drive";
+  const { saveNow } = useAutosave({ drive });
   const [findOpen, setFindOpen] = useState(false);
   const openFind = useCallback(() => setFindOpen(true), []);
   const { spaceHeld } = useKeyboardShortcuts({ onSave: saveNow, onFind: openFind });
@@ -390,7 +418,7 @@ export function MindMapEditor({ initial }: { initial: MindMapRecord }) {
             Mapas
           </Link>
           <TitleField />
-          <SaveIndicator onRetry={() => void saveNow()} onKeepMine={() => void keepMineAsCopy()} />
+          <SaveIndicator onRetry={() => void saveNow()} onKeepMine={() => void keepMineAsCopy()} drive={drive} />
         </header>
 
         <div className="mm-topright">

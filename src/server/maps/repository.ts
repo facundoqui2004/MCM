@@ -5,6 +5,7 @@ import { createDefaultDoc } from "@/features/mindmap/model/factory";
 import type { MindMapDoc, MindMapRecord, MindMapSummary } from "@/features/mindmap/model/types";
 import { db, ensureSchema } from "../db/client";
 import { mindMaps, type MindMapRow } from "../db/schema";
+import type { MapsRepository, SaveResult } from "./types";
 
 const toRecord = (r: MindMapRow): MindMapRecord => ({
   id: r.id,
@@ -12,6 +13,7 @@ const toRecord = (r: MindMapRow): MindMapRecord => ({
   version: r.version,
   doc: r.data,
   updatedAt: r.updatedAt.toISOString(),
+  storage: "local",
 });
 
 export async function listMaps(): Promise<MindMapSummary[]> {
@@ -40,11 +42,6 @@ export async function createMap(input: { title?: string; doc?: MindMapDoc }): Pr
     .returning();
   return toRecord(row);
 }
-
-export type SaveResult =
-  | { ok: true; version: number; updatedAt: string }
-  | { ok: false; reason: "not_found" }
-  | { ok: false; reason: "conflict"; current: MindMapRecord };
 
 /**
  * Guardado con concurrencia optimista: el UPDATE sólo aplica si la versión en
@@ -75,3 +72,6 @@ export async function deleteMap(id: string): Promise<boolean> {
   const res = await db.delete(mindMaps).where(eq(mindMaps.id, id)).returning({ id: mindMaps.id });
   return res.length > 0;
 }
+
+/** Mapas en la base de datos del sitio (modo sin cuenta) */
+export const localRepository: MapsRepository = { storage: "local", listMaps, getMap, createMap, saveMap, deleteMap };

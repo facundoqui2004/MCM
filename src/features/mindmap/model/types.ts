@@ -91,4 +91,6 @@ export interface MindMapRecord {
   version: number;
   doc: MindMapDoc;
   updatedAt: string;
+  /** "drive": en el Google Drive del usuario · "local": en la base de datos del sitio */
+  storage?: "drive" | "local";
 }
