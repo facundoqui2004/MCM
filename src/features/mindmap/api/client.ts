@@ -1,5 +1,8 @@
 import type { MindMapDoc, MindMapRecord, MindMapSummary } from "../model/types";
 
+/** Límite de los navegadores para pedidos keepalive (64 KB), con margen */
+const KEEPALIVE_MAX_BYTES = 60_000;
+
 export class ConflictError extends Error {
   constructor(public current: MindMapRecord) {
     super("El mapa cambió en otra pestaña o dispositivo");
@@ -34,11 +37,14 @@ export const mapsApi = {
     }).then((r) => json<MindMapRecord>(r)),
 
   save: async (id: string, input: { title: string; doc: MindMapDoc; version: number }) => {
+    const body = JSON.stringify(input);
     const res = await fetch(`/api/maps/${id}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
-      keepalive: true,
+      body,
+      // keepalive deja terminar el guardado aunque se cierre la pestaña, pero el navegador
+      // rechaza esos pedidos si pesan más de 64 KB (un mapa con fotos): ahí va uno normal
+      keepalive: new Blob([body]).size < KEEPALIVE_MAX_BYTES,
     });
     if (res.status === 409) throw new ConflictError((await res.json()).current);
     return json<{ version: number; updatedAt: string }>(res);
