@@ -10,17 +10,20 @@ import { createSampleDoc } from "@/features/mindmap/model/factory";
 export function NewMapButtons({ showSample }: { showSample: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"blank" | "sample" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const create = async (kind: "blank" | "sample") => {
     setBusy(kind);
+    setError(null);
     try {
       const map =
         kind === "sample"
           ? await mapsApi.create({ title: "Lanzar Mindmap Studio", doc: createSampleDoc() })
           : await mapsApi.create({ title: "Idea central" });
       router.push(`/map/${map.id}`);
-    } catch {
+    } catch (err) {
       setBusy(null);
+      setError(err instanceof Error && err.message ? err.message : "No se pudo crear el mapa. Probá de nuevo");
     }
   };
 
@@ -51,6 +54,11 @@ export function NewMapButtons({ showSample }: { showSample: boolean }) {
           {busy === "sample" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
           Abrir un ejemplo
         </motion.button>
+      )}
+      {error && (
+        <p className="home-error" role="alert">
+          {error}
+        </p>
       )}
     </div>
   );

@@ -2173,3 +2173,15 @@ kbd {
   font-size: 14px;
   color: var(--ink-soft);
 }
+
+.home-error {
+  flex-basis: 100%;
+  max-width: 46ch;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: color-mix(in oklab, var(--danger) 13%, transparent);
+}

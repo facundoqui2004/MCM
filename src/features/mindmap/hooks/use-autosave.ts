@@ -56,6 +56,8 @@ export function useAutosave({ drive = false }: { drive?: boolean } = {}) {
         useMindMap.getState().setSaveStatus("auth");
       } else {
         useMindMap.getState().setSaveStatus("error");
+        // TypeError = no llegó al servidor (sin internet); si no, el servidor explicó el motivo
+        useMindMap.setState({ saveError: err instanceof TypeError ? null : err instanceof Error ? err.message : String(err) });
         const delay = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** attempts.current);
         attempts.current += 1;
         schedule(() => void saveNow(), delay);

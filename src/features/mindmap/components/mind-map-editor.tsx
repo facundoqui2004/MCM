@@ -91,9 +91,15 @@ function TitleField() {
 
 function SaveIndicator({ onRetry, onKeepMine, drive }: { onRetry: () => void; onKeepMine: () => void; drive: boolean }) {
   const status = useMindMap((s) => s.saveStatus);
+  const saveError = useMindMap((s) => s.saveError);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   if (status === "idle") return null;
-  const text = drive && status === "saved" ? "Guardado en tu Drive" : STATUS_COPY[status];
+  const text =
+    drive && status === "saved"
+      ? "Guardado en tu Drive"
+      : status === "error" && saveError
+        ? `No se pudo guardar: ${saveError}. Lo tuyo sigue acá y se reintenta solo`
+        : STATUS_COPY[status];
   return (
     <span className={`mm-status is-${status}`} role="status">
       <i aria-hidden />

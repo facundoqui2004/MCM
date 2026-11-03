@@ -42,6 +42,8 @@ export interface MindMapState extends Snapshot {
   /** Se incrementa cuando cargan las webfonts y cambian las medidas */
   fontEpoch: number;
   saveStatus: SaveStatus;
+  /** Motivo del último guardado fallido, tal como lo dijo el servidor (null = sin conexión) */
+  saveError: string | null;
   past: Snapshot[];
   future: Snapshot[];
   /** Último borrado, para el aviso con "Deshacer" (stamp cambia en cada borrado) */
@@ -207,6 +209,7 @@ export const useMindMap = create<MindMapState>()(
       revision: 0,
       fontEpoch: 0,
       saveStatus: "idle",
+      saveError: null,
       past: [],
       future: [],
       lastDeleted: null,
@@ -249,7 +252,8 @@ export const useMindMap = create<MindMapState>()(
       },
 
       setTitle: (title) => commit({ title }, { history: false }),
-      setSaveStatus: (saveStatus, version) => set(version ? { saveStatus, version } : { saveStatus }),
+      setSaveStatus: (saveStatus, version) =>
+        set({ saveStatus, ...(version ? { version } : null), ...(saveStatus === "error" ? null : { saveError: null }) }),
 
       select: (id) => set({ selectedId: id, selectedRelationId: null, editingRelationId: null }),
 

@@ -99,8 +99,10 @@ export function driveRepository(session: Session): MapsRepository {
   async function meta(id: string): Promise<DriveFile | null> {
     if (!/^[\w-]{10,}$/.test(id)) return null;
     const res = await call(`${GOOGLE.drive}/files/${id}?fields=id,name,modifiedTime,trashed,appProperties`);
-    if (res.status === 404 || res.status === 403) return null;
-    if (!res.ok) throw new DriveError(res.status, `Google Drive respondió ${res.status}`);
+    // 404 = no existe o no es de esta app (con drive.file Google responde 404 para archivos ajenos).
+    // Un 403 NO es "no existe": son límites de pedidos, permisos o la API deshabilitada.
+    if (res.status === 404) return null;
+    if (!res.ok) throw new DriveError(res.status, `Google Drive respondió ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const f = (await res.json()) as DriveFile;
     return f.trashed || f.appProperties?.[TAG] !== "map" ? null : f;
   }
@@ -109,7 +111,8 @@ export function driveRepository(session: Session): MapsRepository {
     const f = await meta(id);
     if (!f) return null;
     const res = await call(`${GOOGLE.drive}/files/${id}?alt=media`);
-    if (!res.ok) return null;
+    if (res.status === 404) return null;
+    if (!res.ok) throw new DriveError(res.status, `Google Drive respondió ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const raw = (await res.json().catch(() => null)) as Partial<StoredFile> | null;
     const doc = mindMapDocSchema.safeParse(raw?.doc);
     if (!doc.success) return null; // el archivo se editó a mano y ya no es un mapa válido
