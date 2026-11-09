@@ -6,7 +6,7 @@ type Nodes = Record<string, MindNodeModel>;
 
 export function centerOf(nodes: Nodes, id: string) {
   const n = nodes[id];
-  const s = measureNode(n.text, depthOf(nodes, id), n.image);
+  const s = measureNode(n.text, depthOf(nodes, id), n.image, n.bold);
   return { x: n.x + s.width / 2, y: n.y + s.height / 2, width: s.width, height: s.height };
 }
 

@@ -23,6 +23,7 @@ import { useMindMap } from "../store/mindmap-store";
 import { useTheme } from "@/features/theme/theme-store";
 import { THEMES } from "@/features/theme/themes";
 import { BranchEdge } from "./branch-edge";
+import { DrawLayer } from "./draw-layer";
 import { MindNode } from "./mind-node";
 import { RelationEdge } from "./relation-edge";
 
@@ -149,7 +150,7 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
     zIndex: id === selectedId ? 20 : 10 - Math.min(depths[id], 9),
     // Hasta que React Flow mida el DOM, le damos nuestra medida (es exacta): así no
     // oculta el nodo recién creado y su editor puede tomar el foco en el mismo cuadro.
-    measured: measured.current.get(id) ?? measureNode(nodes[id].text, depths[id], nodes[id].image),
+    measured: measured.current.get(id) ?? measureNode(nodes[id].text, depths[id], nodes[id].image, nodes[id].bold),
   }));
 
   const rfEdges: Edge[] = useMemo(() => {
@@ -313,6 +314,7 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
             color="var(--grid-color)"
           />
         )}
+        <DrawLayer />
       </ReactFlow>
       {dropping && (
         <div className="mm-drop-hint" aria-hidden>

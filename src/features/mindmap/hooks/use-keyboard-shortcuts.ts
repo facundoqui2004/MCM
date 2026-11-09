@@ -32,6 +32,14 @@ export function useKeyboardShortcuts({ onSave, onFind }: { onSave: () => void; o
       const mod = e.metaKey || e.ctrlKey;
       const sel = s.selectedId;
 
+      // Ctrl B / Ctrl U: negrita y subrayado de la idea elegida
+      if (mod && !e.altKey && sel && (e.key === "b" || e.key === "B" || e.key === "u" || e.key === "U")) {
+        e.preventDefault();
+        const key = e.key.toLowerCase() === "b" ? "bold" : "underline";
+        s.setNodeStyle([sel], { [key]: !s.nodes[sel]?.[key] });
+        return;
+      }
+
       // Con una flecha de relación seleccionada: Supr la borra, F2/Enter la nombra, Esc la suelta
       const rel = s.selectedRelationId;
       if (rel && !mod && !e.altKey && !isControl(e.target)) {

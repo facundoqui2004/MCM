@@ -98,13 +98,13 @@ function wrap(text: string, t: NodeTypography): { widest: number; lines: number 
  * Tamaño de una idea. Con imagen: la imagen va arriba y el texto debajo
  * (si no hay texto, la idea es sólo la imagen con su margen).
  */
-export function measureNode(text: string, depth: number, image?: { w: number; h: number }): NodeSize {
-  if (!image) return measureText(text, depth);
+export function measureNode(text: string, depth: number, image?: { w: number; h: number }, bold = false): NodeSize {
+  if (!image) return measureText(text, depth, bold);
   const b = imageBox(image);
   if (!text.trim()) {
     return { width: b.width + IMG_PAD * 2 + 2, height: b.height + IMG_PAD * 2 + 2, lines: 0, image: b };
   }
-  const t = measureText(text, depth);
+  const t = measureText(text, depth, bold);
   return {
     width: Math.max(t.width, b.width + IMG_PAD * 2 + 2),
     height: t.height + b.height + IMG_PAD,
@@ -113,11 +113,20 @@ export function measureNode(text: string, depth: number, image?: { w: number; h:
   };
 }
 
-function measureText(text: string, depth: number): NodeSize {
-  const key = `${Math.min(depth, 2)}|${text}`;
+/** Peso de la letra en negrita (más ancha: la idea crece para que el texto entre) */
+export const BOLD_WEIGHT = 780;
+
+/** Tipografía de una idea, contando la negrita que le haya puesto el usuario */
+export function typographyOf(depth: number, bold = false): NodeTypography {
+  const t = typographyFor(depth);
+  return bold ? { ...t, fontWeight: Math.max(t.fontWeight, BOLD_WEIGHT) } : t;
+}
+
+function measureText(text: string, depth: number, bold = false): NodeSize {
+  const key = `${Math.min(depth, 2)}|${bold ? "b" : ""}|${text}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const t = typographyFor(depth);
+  const t = typographyOf(depth, bold);
   const { widest, lines } = wrap(text || " ", t);
   const size: NodeSize = {
     width: Math.ceil(Math.max(t.minWidth, widest + t.padX * 2 + 2)),

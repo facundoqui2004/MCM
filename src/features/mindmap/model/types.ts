@@ -51,6 +51,12 @@ export interface MindNodeModel {
    * idea central. Puede tener sus propias hijas; su posición la elige el usuario.
    */
   floating?: boolean;
+  /** Color de relleno elegido por el usuario (#rrggbb). Sin él, el color sale del tema y la rama */
+  fill?: string;
+  /** Texto en negrita */
+  bold?: boolean;
+  /** Texto subrayado */
+  underline?: boolean;
   /** Esquina superior izquierda en coordenadas del lienzo */
   x: number;
   y: number;
@@ -67,6 +73,20 @@ export interface Relation {
   label: string;
 }
 
+/**
+ * Trazo dibujado a mano alzada sobre el mapa (lápiz). Los puntos están en
+ * coordenadas del lienzo, así que el dibujo acompaña el zoom y el paneo.
+ */
+export interface Stroke {
+  id: string;
+  /** #rrggbb */
+  color: string;
+  /** grosor en unidades del lienzo */
+  width: number;
+  /** x0, y0, x1, y1, … */
+  points: number[];
+}
+
 export interface MindMapDoc {
   schemaVersion: 1;
   rootId: string;
@@ -76,6 +96,8 @@ export interface MindMapDoc {
   nodes: Record<string, MindNodeModel>;
   /** Relaciones libres. Los mapas viejos no las tienen */
   relations?: Relation[];
+  /** Dibujos a mano alzada. Los mapas viejos no los tienen */
+  drawings?: Stroke[];
 }
 
 export interface MindMapSummary {

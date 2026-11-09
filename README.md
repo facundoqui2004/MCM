@@ -16,6 +16,7 @@ Editor de mapas mentales en el navegador, pensado para **estudiar y repasar**. A
 | ↗️ | **Flechas de relación con nombre** entre dos ideas cualesquiera, aunque estén en ramas distintas |
 | 🖼️ | **Imágenes dentro de las ideas**: botón, `Ctrl V` o arrastrar un archivo |
 | 🫧 | **Ideas sueltas (flotantes)** que no cuelgan de la idea central y pueden tener su propia rama |
+| 🖍️ | **Formato y lápiz**: pintar ideas de un color, negrita, subrayado y dibujar a mano alzada sobre el mapa |
 | ☁️ | **Iniciar sesión con Google**: tus mapas se guardan en tu propio Google Drive |
 | 🎨 | Cada rama principal estrena color, también cuando se crea con `Enter` |
 
@@ -36,6 +37,11 @@ Sin iniciar sesión, la app funciona como antes y guarda en la base de datos del
 ### Teclado primero
 
 `Tab` crea una idea hija, `Enter` una hermana y tipear sobre una idea reemplaza su texto. Las flechas recorren el mapa y `F2` (o doble clic) renombra. Todo también se puede hacer con el mouse desde la barra de abajo. Hay tres distribuciones automáticas, **mapa**, **árbol** y **radial**, con transiciones animadas.
+
+### Formato y lápiz
+
+- **Color, negrita y subrayado:** al elegir una idea aparece una barrita arriba de ella, con negrita, subrayado, 9 colores de relleno y un selector para elegir cualquier otro. El texto se pone oscuro o blanco solo, según el color, para que siempre se lea. También funcionan `Ctrl B` y `Ctrl U`, incluso mientras escribís.
+- **Lápiz:** el botón **Lápiz** de la barra de abajo permite dibujar a mano alzada sobre el mapa, por ejemplo para marcar con un círculo lo que entra en el parcial. Tiene 6 colores, 3 grosores, goma y *borrar todo*. Los trazos acompañan el zoom y se guardan con el mapa. Mientras dibujás, la rueda hace zoom y `Espacio` + arrastrar mueve el lienzo. Sale con `Esc` o **Listo**. Todo se deshace con `Ctrl Z`.
 
 ### Notas por idea
 
@@ -133,6 +139,8 @@ Cinco temas: **Papel** (el principal), **Cuaderno**, **Lavanda**, **Minimal** y 
 
 | Tecla | Acción |
 |---|---|
+| `Ctrl B` / `Ctrl U` | Negrita / subrayado de la idea |
+| Lápiz → `Esc` | Salir del modo dibujo |
 | `/` | Plegar o desplegar la rama |
 | `-` / `+` | Plegar todo / desplegar un nivel |
 | `Ctrl F` | Buscar en el mapa (también en las notas) |

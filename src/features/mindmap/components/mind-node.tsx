@@ -5,7 +5,10 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Maximize2, Minus, NotebookTe
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { outwardOf, siblingAxis } from "../model/geometry";
-import { IMG_PAD, measureNode, typographyFor } from "../model/measure";
+import { borderFor, inkOn } from "../model/colors";
+import { IMG_PAD, measureNode, typographyOf } from "../model/measure";
+import { useDrawUi } from "../store/draw-ui-store";
+import { NodeFormatBar } from "./node-format-bar";
 import { accentOf } from "../model/palette";
 import { depthOf, descendantsOf } from "../model/tree";
 import type { Direction } from "../model/types";
@@ -83,7 +86,7 @@ function QuickAdd({ dir, gap, label, onClick, kind }: { dir: Direction; gap: num
   );
 }
 
-function NodeEditor({ id, seed, depth, top }: { id: string; seed: string | null; depth: number; top: number }) {
+function NodeEditor({ id, seed, depth, top, bold }: { id: string; seed: string | null; depth: number; top: number; bold: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const draft = useMindMap((s) => s.editDraft ?? "");
   const setDraft = useMindMap((s) => s.setDraft);
@@ -130,7 +133,7 @@ function NodeEditor({ id, seed, depth, top }: { id: string; seed: string | null;
     else s.commitEdit(id, s.editDraft ?? "");
   };
 
-  const t = typographyFor(depth);
+  const t = typographyOf(depth, bold);
   return (
     <textarea
       ref={ref}
@@ -155,6 +158,12 @@ function NodeEditor({ id, seed, depth, top }: { id: string; seed: string | null;
         } else if (e.key === "Escape") {
           e.preventDefault();
           finish("cancel");
+        } else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B" || e.key === "u" || e.key === "U")) {
+          // negrita / subrayado mientras se escribe: se aplica a toda la idea
+          e.preventDefault();
+          const n = useMindMap.getState().nodes[id];
+          const key = e.key.toLowerCase() === "b" ? "bold" : "underline";
+          useMindMap.getState().setNodeStyle([id], { [key]: !n?.[key] });
         }
       }}
     />
@@ -174,6 +183,7 @@ function MindNodeImpl({ id }: NodeProps) {
   const hiddenCount = useMindMap((s) => (s.nodes[id]?.collapsed ? descendantsOf(s.nodes, id).length : 0));
   useMindMap((s) => s.fontEpoch); // re-render cuando cambian las medidas
   const draft = useMindMap((s) => (s.editingId === id ? s.editDraft : null));
+  const drawing = useDrawUi((d) => d.tool !== null);
   const [hover, setHover] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   // Si la idea se mueve (animación de layout) y deja de estar bajo el cursor, el
@@ -194,10 +204,10 @@ function MindNodeImpl({ id }: NodeProps) {
   if (!node) return null;
 
   const accent = accentOf(node.color, isRoot);
-  const t = typographyFor(depth);
-  const committed = measureNode(node.text, depth, node.image);
+  const t = typographyOf(depth, !!node?.bold);
+  const committed = measureNode(node.text, depth, node.image, node.bold);
   // al escribir en una idea con imagen siempre hay lugar para el texto, aunque esté vacío
-  const size = draft === null ? committed : measureNode(node.image && !draft.trim() ? "Mm" : draft, depth, node.image);
+  const size = draft === null ? committed : measureNode(node.image && !draft.trim() ? "Mm" : draft, depth, node.image, node.bold);
   const imgTop = size.image ? size.image.height + IMG_PAD : 0;
   const isFloatingRoot = !!node.floating && !node.parentId;
   // Mientras se edita, el nodo crece alejándose de su padre (y centrado en el eje
@@ -212,7 +222,7 @@ function MindNodeImpl({ id }: NodeProps) {
   const s = useMindMap.getState;
   const multiline = size.lines > 1;
   const hasNote = !!node.note?.trim();
-  const showConnectors = (hover || selected) && !editing && !dragging;
+  const showConnectors = (hover || selected) && !editing && !dragging && !drawing;
 
   const tier = isRoot ? "mm-node--root" : depth === 1 ? "mm-node--branch" : "mm-node--leaf";
 
@@ -246,8 +256,10 @@ function MindNodeImpl({ id }: NodeProps) {
         />
       ))}
 
+      <NodeFormatBar id={id} visible={selected && !editing && !dragging && !drawing} />
+
       <motion.div
-        className={`mm-node ${tier} ${selected ? "is-selected" : ""} ${editing ? "is-editing" : ""}`}
+        className={`mm-node ${tier}${node.fill ? " has-fill" : ""} ${selected ? "is-selected" : ""} ${editing ? "is-editing" : ""}`}
         style={{
           width: size.width,
           height: size.height,
@@ -257,6 +269,8 @@ function MindNodeImpl({ id }: NodeProps) {
           marginRight: -(dw + growX),
           marginBottom: -(dh + growY),
           borderRadius: node.image ? 16 : isRoot ? 999 : multiline ? 18 : 999,
+          // color elegido por el usuario: pisa el del tema (el contorno de selección sigue siendo el de la rama)
+          ...(node.fill ? { background: node.fill, borderColor: selected ? undefined : borderFor(node.fill), backdropFilter: "none" } : null),
         }}
         initial={{ scale: 0.55, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -303,11 +317,21 @@ function MindNodeImpl({ id }: NodeProps) {
           </div>
         )}
         {editing ? (
-          <NodeEditor id={id} seed={editSeed} depth={depth} top={imgTop} />
+          <NodeEditor id={id} seed={editSeed} depth={depth} top={imgTop} bold={!!node.bold} />
         ) : node.image && !node.text.trim() ? null : (
           <div
             className="mm-label"
-            style={{ fontFamily: t.fontFamily, fontSize: t.fontSize, fontWeight: t.fontWeight, lineHeight: `${t.lineHeight}px`, padding: `${t.padY}px ${t.padX}px` }}
+            style={{
+              fontFamily: t.fontFamily,
+              fontSize: t.fontSize,
+              fontWeight: t.fontWeight,
+              lineHeight: `${t.lineHeight}px`,
+              padding: `${t.padY}px ${t.padX}px`,
+              ...(node.fill ? { color: inkOn(node.fill) } : null),
+              ...(node.underline
+                ? { textDecorationLine: "underline", textDecorationThickness: 2, textUnderlineOffset: 4 }
+                : null),
+            }}
           >
             {node.text}
           </div>

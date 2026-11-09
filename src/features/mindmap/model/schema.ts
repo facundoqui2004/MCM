@@ -25,6 +25,9 @@ export const mindNodeSchema = z.object({
     })
     .optional(),
   floating: z.boolean().optional(),
+  fill: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  bold: z.boolean().optional(),
+  underline: z.boolean().optional(),
   x: z.number().finite(),
   y: z.number().finite(),
 });
@@ -36,6 +39,13 @@ export const relationSchema = z.object({
   label: z.string().max(200),
 });
 
+export const strokeSchema = z.object({
+  id: z.string().min(1).max(64),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  width: z.number().positive().max(80),
+  points: z.array(z.number().finite()).min(2).max(6000),
+});
+
 export const mindMapDocSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -44,6 +54,7 @@ export const mindMapDocSchema = z
     autoLayout: z.boolean(),
     nodes: z.record(z.string(), mindNodeSchema),
     relations: z.array(relationSchema).max(1000).optional(),
+    drawings: z.array(strokeSchema).max(3000).optional(),
   })
   .superRefine((doc, ctx) => {
     const ids = Object.keys(doc.nodes);

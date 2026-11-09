@@ -6,7 +6,7 @@ import type { LayoutMode, MindNodeModel, XY } from "./types";
 type Nodes = Record<string, MindNodeModel>;
 export type Positions = Record<string, XY>;
 
-const sizeOf = (nodes: Nodes, id: string, depth: number) => measureNode(nodes[id].text, depth, nodes[id].image);
+const sizeOf = (nodes: Nodes, id: string, depth: number) => measureNode(nodes[id].text, depth, nodes[id].image, nodes[id].bold);
 
 /* ------------------------------------------------------------------------ */
 /* Layout bilateral (estilo XMind): "tidy tree" propio, determinista y que   */

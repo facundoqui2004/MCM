@@ -8,6 +8,7 @@ import {
   CornerDownRight,
   GitFork,
   ImagePlus,
+  PenLine,
   Shapes,
   ListPlus,
   Network,
@@ -28,6 +29,7 @@ import { measureNode } from "../model/measure";
 import { placeImage } from "./mind-map-canvas";
 import { useMindMap } from "../store/mindmap-store";
 import { useNoteUi } from "../store/note-ui-store";
+import { useDrawUi } from "../store/draw-ui-store";
 
 const spring = { type: "spring", stiffness: 500, damping: 22 } as const;
 
@@ -39,6 +41,7 @@ function DockButton({
   onClick,
   disabled,
   danger,
+  pressed,
 }: {
   icon: LucideIcon;
   label: string;
@@ -49,6 +52,8 @@ function DockButton({
   /** Si viene un texto, el botón está apagado y el tooltip explica por qué */
   disabled?: string | false;
   danger?: boolean;
+  /** Botón que activa un modo (el lápiz): queda marcado mientras está activo */
+  pressed?: boolean;
 }) {
   const [hover, setHover] = useState(false);
   return (
@@ -63,6 +68,7 @@ function DockButton({
         type="button"
         aria-label={keys ? `${label} (${keys})` : label}
         aria-disabled={disabled ? true : undefined}
+        aria-pressed={pressed}
         aria-description={disabled || undefined}
         onClick={(e) => {
           if (disabled) return;
@@ -71,7 +77,7 @@ function DockButton({
           // con teclado (detail === 0) el foco se queda en el botón
           if (e.detail > 0) e.currentTarget.blur();
         }}
-        className={`mm-dock-btn ${text ? "has-text" : ""} ${danger ? "is-danger" : ""} ${disabled ? "is-disabled" : ""}`}
+        className={`mm-dock-btn ${text ? "has-text" : ""} ${danger ? "is-danger" : ""} ${disabled ? "is-disabled" : ""} ${pressed ? "is-pressed" : ""}`}
         whileHover={disabled ? undefined : { scale: 1.08, y: -2 }}
         whileTap={disabled ? undefined : { scale: 0.92 }}
         transition={spring}
@@ -122,6 +128,7 @@ export function Dock() {
   const anyCollapsed = useMindMap((s) => Object.values(s.nodes).some((n) => n.collapsed && n.children.length > 0));
   const s = useMindMap.getState;
   const fileInput = useRef<HTMLInputElement>(null);
+  const drawTool = useDrawUi((d) => d.tool);
 
   /** Punto del lienzo (coordenadas del mapa) en una fracción de la pantalla visible */
   const screenPoint = (fx: number, fy: number) =>
@@ -174,6 +181,19 @@ export function Dock() {
             const f = e.target.files?.[0];
             e.target.value = "";
             if (f) void placeImage(f, { nodeId: s().selectedId, at: screenPoint(0.5, 0.42) });
+          }}
+        />
+        <DockButton
+          icon={PenLine}
+          label={drawTool ? "Terminar de dibujar" : "Dibujar sobre el mapa"}
+          text="Lápiz"
+          keys={drawTool ? "Esc" : undefined}
+          pressed={!!drawTool}
+          onClick={() => {
+            if (drawTool) return useDrawUi.getState().setTool(null);
+            // sin idea elegida, las teclas no editan nada mientras se dibuja
+            s().select(null);
+            useDrawUi.getState().setTool("pen");
           }}
         />
         <DockButton icon={Trash2} label="Borrar idea y su rama" keys="Supr" danger disabled={!selectedId ? "Seleccioná una idea primero" : selectedId === rootId && "La idea central no se borra"} onClick={() => selectedId && s().deleteNode(selectedId)} />

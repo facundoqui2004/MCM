@@ -8,7 +8,7 @@ import { applyPositions, computeLayout } from "../model/layout";
 import { measureNode } from "../model/measure";
 import { BRANCH_COUNT } from "../model/palette";
 import { depthOf, descendantsOf, floatingRoots, visibleChildren } from "../model/tree";
-import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, NodeImage, Relation, Side, XY } from "../model/types";
+import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, NodeImage, Relation, Side, Stroke, XY } from "../model/types";
 
 type Nodes = Record<string, MindNodeModel>;
 
@@ -18,6 +18,7 @@ interface Snapshot {
   layoutMode: LayoutMode;
   autoLayout: boolean;
   relations: Relation[];
+  drawings: Stroke[];
 }
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error" | "conflict" | "auth";
@@ -89,6 +90,15 @@ export interface MindMapState extends Snapshot {
   /** Pone o quita (null) la imagen de una idea */
   setImage: (id: string, image: NodeImage | null) => boolean;
 
+  /**
+   * Formato de una o varias ideas: color de relleno (null = el del tema),
+   * negrita y subrayado. La negrita cambia el tamaño, así que reordena.
+   */
+  setNodeStyle: (ids: string[], patch: { fill?: string | null; bold?: boolean; underline?: boolean }) => void;
+  /** Dibujo a mano alzada sobre el mapa */
+  addStroke: (stroke: Stroke) => void;
+  removeStrokes: (ids: string[]) => void;
+
   /** Crea una flecha de relación (si ya existe entre esas dos ideas, la selecciona) */
   addRelation: (from: string, to: string) => string | null;
   selectRelation: (id: string | null) => void;
@@ -121,6 +131,7 @@ const snap = (s: Snapshot): Snapshot => ({
   layoutMode: s.layoutMode,
   autoLayout: s.autoLayout,
   relations: s.relations,
+  drawings: s.drawings,
 });
 
 /** Saca las relaciones que quedaron apuntando a ideas borradas */
@@ -157,14 +168,14 @@ function freePlacement(nodes: Nodes, parentId: string, newId: string, rootId: st
   const parent = nodes[parentId];
   const child = nodes[newId];
   const pd = depthOf(nodes, parentId);
-  const ps = measureNode(parent.text, pd, parent.image);
-  const cs = measureNode(child.text, pd + 1, child.image);
+  const ps = measureNode(parent.text, pd, parent.image, parent.bold);
+  const cs = measureNode(child.text, pd + 1, child.image, child.bold);
   const siblings = parent.children.filter((c) => c !== newId && nodes[c].side === child.side);
   const gap = parentId === rootId ? 84 : 52;
   const x = child.side === "right" ? parent.x + ps.width + gap : parent.x - gap - cs.width;
   if (!siblings.length) return { x, y: parent.y + ps.height / 2 - cs.height / 2 };
   const last = nodes[siblings[siblings.length - 1]];
-  const ls = measureNode(last.text, pd + 1, last.image);
+  const ls = measureNode(last.text, pd + 1, last.image, last.bold);
   return { x, y: last.y + ls.height + 14 };
 }
 
@@ -199,6 +210,7 @@ export const useMindMap = create<MindMapState>()(
       layoutMode: "map",
       autoLayout: true,
       relations: [],
+      drawings: [],
       selectedRelationId: null,
       editingRelationId: null,
       selectedId: null,
@@ -225,6 +237,7 @@ export const useMindMap = create<MindMapState>()(
           layoutMode: doc.layoutMode,
           autoLayout: doc.autoLayout,
           relations: liveRelations(doc.relations ?? [], doc.nodes),
+          drawings: doc.drawings ?? [],
           selectedRelationId: null,
           editingRelationId: null,
           selectedId: doc.rootId,
@@ -248,6 +261,7 @@ export const useMindMap = create<MindMapState>()(
           autoLayout: s.autoLayout,
           nodes: s.nodes,
           ...(s.relations.length ? { relations: s.relations } : null),
+          ...(s.drawings.length ? { drawings: s.drawings } : null),
         };
       },
 
@@ -326,7 +340,7 @@ export const useMindMap = create<MindMapState>()(
           nodes[sib.id] = { ...sib, x: node.x, y: node.y };
           nodes = relaid(s, nodes);
         } else {
-          const ns = measureNode(node.text, depthOf(s.nodes, id), node.image);
+          const ns = measureNode(node.text, depthOf(s.nodes, id), node.image, node.bold);
           const dy = where === "after" ? ns.height + 14 : -(ns.height + 14);
           nodes[sib.id] = { ...sib, x: node.x, y: node.y + dy };
         }
@@ -501,6 +515,46 @@ export const useMindMap = create<MindMapState>()(
         return true;
       },
 
+      setNodeStyle: (ids, patch) => {
+        const s = get();
+        const nodes: Nodes = { ...s.nodes };
+        let changed = false;
+        for (const id of ids) {
+          const n = nodes[id];
+          if (!n) continue;
+          const next: MindNodeModel = { ...n };
+          if (patch.fill !== undefined) {
+            if (patch.fill) next.fill = patch.fill;
+            else delete next.fill;
+          }
+          if (patch.bold !== undefined) {
+            if (patch.bold) next.bold = true;
+            else delete next.bold;
+          }
+          if (patch.underline !== undefined) {
+            if (patch.underline) next.underline = true;
+            else delete next.underline;
+          }
+          if (next.fill !== n.fill || next.bold !== n.bold || next.underline !== n.underline) {
+            nodes[id] = next;
+            changed = true;
+          }
+        }
+        if (changed) commit({ nodes: patch.bold !== undefined ? settle(nodes) : nodes });
+      },
+
+      addStroke: (stroke) => {
+        const s = get();
+        commit({ drawings: [...s.drawings, stroke] });
+      },
+
+      removeStrokes: (ids) => {
+        const s = get();
+        const gone = new Set(ids);
+        const drawings = s.drawings.filter((d) => !gone.has(d.id));
+        if (drawings.length !== s.drawings.length) commit({ drawings });
+      },
+
       addRelation: (from, to) => {
         const s = get();
         if (from === to || !s.nodes[from] || !s.nodes[to]) return null;
@@ -582,7 +636,7 @@ export const useMindMap = create<MindMapState>()(
         const n = s.nodes[id];
         if (!n) return;
         const center = (m: MindNodeModel) => {
-          const sz = measureNode(m.text, depthOf(s.nodes, m.id), m.image);
+          const sz = measureNode(m.text, depthOf(s.nodes, m.id), m.image, m.bold);
           return { x: m.x + sz.width / 2, y: m.y + sz.height / 2 };
         };
         const c = center(n);

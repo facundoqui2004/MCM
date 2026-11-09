@@ -2185,3 +2185,162 @@ kbd {
   color: var(--ink);
   background: color-mix(in oklab, var(--danger) 13%, transparent);
 }
+
+/* ───────── Formato de las ideas (barrita sobre la idea elegida) ───────── */
+.mm-format,
+.mm-drawbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface-solid);
+  border: 1px solid var(--hair-strong);
+  box-shadow: var(--shadow-pop);
+  white-space: nowrap;
+}
+.mm-format-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.mm-format-btn--small {
+  width: 26px;
+}
+.mm-format-btn:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--overlay);
+}
+.mm-format-btn[aria-pressed="true"] {
+  color: var(--on-accent);
+  background: var(--root-accent);
+}
+.mm-format-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.mm-format-btn.is-danger {
+  color: #fff;
+  background: var(--danger);
+}
+.mm-format-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--hair-strong);
+}
+.mm-format-swatches {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.mm-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  /* contorno que se ve tanto en temas claros como en el oscuro */
+  border: 1px solid color-mix(in oklab, var(--ink) 28%, transparent);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.mm-swatch:hover {
+  transform: scale(1.15);
+}
+.mm-swatch[aria-checked="true"] {
+  box-shadow:
+    0 0 0 2px var(--surface-solid),
+    0 0 0 4px var(--ink);
+}
+.mm-swatch--custom {
+  background: conic-gradient(#f43f5e, #f59e0b, #84cc16, #06b6d4, #6366f1, #d946ef, #f43f5e);
+}
+.mm-format-picker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.mm-format-btn:focus-visible,
+.mm-swatch:focus-visible,
+.mm-width:focus-visible,
+.mm-drawbar-done:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ───────── Lápiz ───────── */
+.mm-dock-btn.is-pressed {
+  color: var(--on-accent);
+  background: var(--root-accent);
+}
+.mm-drawings {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+.mm-drawings path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* capa que toma el mouse mientras se dibuja (encima de las ideas) */
+.mm-draw-capture {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  touch-action: none;
+  cursor: crosshair;
+}
+.mm-draw-capture.is-eraser {
+  cursor: cell;
+}
+.mm-drawbar {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  z-index: 35;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+}
+.mm-width {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.mm-width i {
+  display: block;
+  border-radius: 999px;
+}
+.mm-width:hover {
+  background: var(--overlay);
+}
+.mm-width[aria-checked="true"] {
+  background: var(--overlay);
+  box-shadow: inset 0 0 0 1.5px var(--ink-soft);
+}
+.mm-drawbar-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  margin-left: 4px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--on-accent);
+  background: var(--root-accent);
+  cursor: pointer;
+}
