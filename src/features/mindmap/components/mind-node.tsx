@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Maximize2, Minus, NotebookText, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Maximize2, Minus, Lock, NotebookText, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { outwardOf, siblingAxis } from "../model/geometry";
@@ -340,6 +340,22 @@ function MindNodeImpl({ id }: NodeProps) {
 
       {/* Marca de nota: la idea tiene apuntes. Clic = abrirla fijada.
           Para escribir una nota nueva: botón "Nota" de la barra o Ctrl Enter. */}
+      {/* Candado: la idea está bloqueada (fija con toda su rama). Clic = desbloquear */}
+      {node.locked && !editing && (
+        <button
+          type="button"
+          className="mm-lock-badge nodrag nopan"
+          aria-label="Idea bloqueada. Desbloquear"
+          title="Bloqueada: ella y su rama están fijas. Clic para desbloquear"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            s().toggleLock(id);
+          }}
+        >
+          <Lock size={8} strokeWidth={2.8} />
+        </button>
+      )}
       {hasNote && !editing && (
         <button
           type="button"

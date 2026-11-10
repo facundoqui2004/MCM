@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { centerOf } from "../model/geometry";
 import { ImageError, fileToNodeImage, imageFileFrom } from "../model/image";
 import { measureNode } from "../model/measure";
-import { floatingRoots } from "../model/tree";
+import { floatingRoots, lockedIds } from "../model/tree";
 import type { XY } from "../model/types";
 import { useAnimatedPositions } from "../hooks/use-animated-positions";
 import { useMindMap } from "../store/mindmap-store";
@@ -141,12 +141,14 @@ export function MindMapCanvas({ spaceHeld }: { spaceHeld: boolean }) {
   const shown = useAnimatedPositions(targets, { instant: dragging, spawnFrom });
   lastShown.current = shown;
 
+  // ideas bloqueadas (candado) y sus ramas: no se pueden arrastrar
+  const locked = useMemo(() => lockedIds(nodes), [nodes]);
   const rfNodes: Node[] = ids.map((id) => ({
     id,
     type: "mind",
     position: shown[id],
     data: {},
-    draggable: editingId !== id,
+    draggable: editingId !== id && !locked.has(id),
     zIndex: id === selectedId ? 20 : 10 - Math.min(depths[id], 9),
     // Hasta que React Flow mida el DOM, le damos nuestra medida (es exacta): así no
     // oculta el nodo recién creado y su editor puede tomar el foco en el mismo cuadro.

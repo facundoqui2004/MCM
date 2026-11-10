@@ -41,6 +41,7 @@ Sin iniciar sesión, la app funciona como antes y guarda en la base de datos del
 ### Formato y lápiz
 
 - **Color, negrita y subrayado:** al elegir una idea aparece una barrita arriba de ella, con negrita, subrayado, 9 colores de relleno y un selector para elegir cualquier otro. El texto se pone oscuro o blanco solo, según el color, para que siempre se lea. También funcionan `Ctrl B` y `Ctrl U`, incluso mientras escribís.
+- **Candado:** el primer botón de esa barrita bloquea la idea: ella y toda su rama quedan fijas en su lugar. No se pueden arrastrar y el orden automático no las mueve, aunque agregues ideas, cambies de distribución o toques *Ordenar*. La idea bloqueada muestra un candadito; un clic en él (o en el botón) la desbloquea.
 - **Lápiz:** el botón **Lápiz** de la barra de abajo permite dibujar a mano alzada sobre el mapa, por ejemplo para marcar con un círculo lo que entra en el parcial. Tiene 6 colores, 3 grosores, goma y *borrar todo*. Los trazos acompañan el zoom y se guardan con el mapa. Mientras dibujás, la rueda hace zoom y `Espacio` + arrastrar mueve el lienzo. Sale con `Esc` o **Listo**. Todo se deshace con `Ctrl Z`.
 
 ### Notas por idea

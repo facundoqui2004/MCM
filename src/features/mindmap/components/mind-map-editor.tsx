@@ -64,6 +64,7 @@ const SHORTCUTS: [string, string][] = [
   ["Clic en la vista previa", "Fijarla para escribir"],
   ["Ctrl Enter", "Abrir la nota de la idea"],
   ["Ctrl B / Ctrl U", "Negrita / subrayado de la idea"],
+  ["Candado (barrita de la idea)", "Bloquear la idea y su rama en su lugar"],
   ["Lápiz (barra de abajo)", "Dibujar sobre el mapa · Esc para salir"],
   ["Doble clic en el lienzo vacío", "Idea suelta (flotante)"],
   ["Ctrl V con una imagen copiada", "Poner la imagen en la idea"],

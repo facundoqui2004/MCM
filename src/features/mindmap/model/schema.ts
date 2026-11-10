@@ -26,6 +26,7 @@ export const mindNodeSchema = z.object({
     .optional(),
   floating: z.boolean().optional(),
   fill: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  locked: z.boolean().optional(),
   bold: z.boolean().optional(),
   underline: z.boolean().optional(),
   x: z.number().finite(),

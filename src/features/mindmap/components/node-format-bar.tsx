@@ -1,9 +1,10 @@
 "use client";
 
 import { NodeToolbar, Position } from "@xyflow/react";
-import { Ban, Bold, Underline } from "lucide-react";
+import { Ban, Bold, Lock, LockOpen, Underline } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { FILL_SWATCHES } from "../model/colors";
+import { lockOwner } from "../model/tree";
 import { useMindMap } from "../store/mindmap-store";
 
 /**
@@ -14,6 +15,10 @@ export function NodeFormatBar({ id, visible }: { id: string; visible: boolean })
   const fill = useMindMap((s) => s.nodes[id]?.fill);
   const bold = useMindMap((s) => !!s.nodes[id]?.bold);
   const underline = useMindMap((s) => !!s.nodes[id]?.underline);
+  // quién la tiene fija: ella misma o una idea de más arriba
+  const owner = useMindMap((s) => lockOwner(s.nodes, id));
+  const ownerText = useMindMap((s) => (owner && owner !== id ? s.nodes[owner]?.text || "otra idea" : null));
+  const locked = owner === id;
   const picker = useRef<HTMLInputElement>(null);
   const set = (patch: Parameters<ReturnType<typeof useMindMap.getState>["setNodeStyle"]>[1]) =>
     useMindMap.getState().setNodeStyle([id], patch);
@@ -39,6 +44,24 @@ export function NodeFormatBar({ id, visible }: { id: string; visible: boolean })
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.preventDefault()}
       >
+        <button
+          type="button"
+          className="mm-format-btn"
+          aria-pressed={locked || !!ownerText}
+          aria-label={locked ? "Desbloquear la idea" : "Bloquear la idea y su rama"}
+          disabled={!!ownerText}
+          title={
+            ownerText
+              ? `Está fija porque «${ownerText}» está bloqueada: desbloqueala ahí`
+              : locked
+                ? "Bloqueada: ella y su rama están fijas. Clic para desbloquear"
+                : "Bloquear: deja fija esta idea y toda su rama"
+          }
+          onClick={() => useMindMap.getState().toggleLock(id)}
+        >
+          {locked || ownerText ? <Lock size={14} strokeWidth={2.4} /> : <LockOpen size={14} strokeWidth={2.2} />}
+        </button>
+        <span className="mm-format-sep" aria-hidden />
         <button
           type="button"
           className="mm-format-btn"

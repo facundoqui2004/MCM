@@ -2344,3 +2344,32 @@ kbd {
   background: var(--root-accent);
   cursor: pointer;
 }
+
+/* ───────── Candado: idea bloqueada ───────── */
+.mm-lock-badge {
+  /* espejo de la marca de nota: adentro de la idea, sobre el margen izquierdo */
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: var(--shadow-small);
+  cursor: pointer;
+}
+.mm-lock-badge:hover {
+  scale: 1.25;
+}
+.mm-lock-badge:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.mm-format-btn[aria-pressed="true"]:disabled {
+  opacity: 0.55;
+}

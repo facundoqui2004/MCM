@@ -53,6 +53,11 @@ export interface MindNodeModel {
   floating?: boolean;
   /** Color de relleno elegido por el usuario (#rrggbb). Sin él, el color sale del tema y la rama */
   fill?: string;
+  /**
+   * Idea bloqueada (candado): ella y toda su rama quedan fijas donde están.
+   * No se pueden arrastrar y el orden automático no las mueve.
+   */
+  locked?: boolean;
   /** Texto en negrita */
   bold?: boolean;
   /** Texto subrayado */

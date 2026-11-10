@@ -7,7 +7,7 @@ import { createNode } from "../model/factory";
 import { applyPositions, computeLayout } from "../model/layout";
 import { measureNode } from "../model/measure";
 import { BRANCH_COUNT } from "../model/palette";
-import { depthOf, descendantsOf, floatingRoots, visibleChildren } from "../model/tree";
+import { depthOf, descendantsOf, floatingRoots, lockedIds, lockOwner, visibleChildren } from "../model/tree";
 import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, NodeImage, Relation, Side, Stroke, XY } from "../model/types";
 
 type Nodes = Record<string, MindNodeModel>;
@@ -95,6 +95,8 @@ export interface MindMapState extends Snapshot {
    * negrita y subrayado. La negrita cambia el tamaño, así que reordena.
    */
   setNodeStyle: (ids: string[], patch: { fill?: string | null; bold?: boolean; underline?: boolean }) => void;
+  /** Bloquea o desbloquea una idea: bloqueada, ella y su rama quedan fijas en su lugar */
+  toggleLock: (id: string) => void;
   /** Dibujo a mano alzada sobre el mapa */
   addStroke: (stroke: Stroke) => void;
   removeStrokes: (ids: string[]) => void;
@@ -138,8 +140,16 @@ const snap = (s: Snapshot): Snapshot => ({
 const liveRelations = (relations: Relation[], nodes: Nodes) =>
   relations.filter((r) => nodes[r.from] && nodes[r.to]);
 
-const relaid = (s: Snapshot, nodes: Nodes = s.nodes): Nodes =>
-  applyPositions(nodes, computeLayout(nodes, s.rootId, s.layoutMode));
+/** Reordena el mapa. Las ideas bloqueadas (y sus ramas) se quedan donde estaban. */
+const relaid = (s: Snapshot, nodes: Nodes = s.nodes): Nodes => {
+  const out = applyPositions(nodes, computeLayout(nodes, s.rootId, s.layoutMode));
+  for (const id of lockedIds(nodes)) {
+    const was = nodes[id];
+    const now = out[id];
+    if (now.x !== was.x || now.y !== was.y) out[id] = { ...now, x: was.x, y: was.y };
+  }
+  return out;
+};
 
 /**
  * Deshacer/rehacer restauran la estructura de una foto del historial, pero el
@@ -312,9 +322,11 @@ export const useMindMap = create<MindMapState>()(
           [parentId]: { ...parent, collapsed: false, children: [...parent.children, child.id] },
           [child.id]: child,
         };
-        if (!s.autoLayout) {
+        if (!s.autoLayout || lockOwner(nodes, parentId)) {
+          // modo libre, o rama bloqueada: la hija se acomoda al lado sin mover a las demás
           const p = freePlacement(nodes, parentId, child.id, s.rootId);
           nodes[child.id] = { ...child, ...p };
+          if (s.autoLayout) nodes = relaid(s, nodes);
         } else {
           // posición inicial = la del padre, así el nodo "nace" desde él al animar
           nodes[child.id] = { ...child, x: parent.x, y: parent.y };
@@ -336,13 +348,14 @@ export const useMindMap = create<MindMapState>()(
         const children = [...parent.children];
         children.splice(idx, 0, sib.id);
         let nodes: Nodes = { ...s.nodes, [parent.id]: { ...parent, children }, [sib.id]: sib };
-        if (s.autoLayout) {
+        if (s.autoLayout && !lockOwner(nodes, parent.id)) {
           nodes[sib.id] = { ...sib, x: node.x, y: node.y };
           nodes = relaid(s, nodes);
         } else {
           const ns = measureNode(node.text, depthOf(s.nodes, id), node.image, node.bold);
           const dy = where === "after" ? ns.height + 14 : -(ns.height + 14);
           nodes[sib.id] = { ...sib, x: node.x, y: node.y + dy };
+          if (s.autoLayout) nodes = relaid(s, nodes);
         }
         commit({ nodes, selectedId: sib.id, selectedRelationId: null, editingRelationId: null, editingId: edit ? sib.id : null, editSeed: null, editDraft: edit ? sib.text : null });
         return sib.id;
@@ -543,6 +556,22 @@ export const useMindMap = create<MindMapState>()(
         if (changed) commit({ nodes: patch.bold !== undefined ? settle(nodes) : nodes });
       },
 
+      toggleLock: (id) => {
+        const s = get();
+        const n = s.nodes[id];
+        if (!n) return;
+        const next: MindNodeModel = { ...n };
+        if (n.locked) delete next.locked;
+        else next.locked = true;
+        // al desbloquear con orden automático, la rama vuelve a acomodarse con el resto
+        commit({ nodes: settle({ ...s.nodes, [id]: next }) });
+        get().notify(
+          n.locked
+            ? "Idea desbloqueada: vuelve a ordenarse con el resto"
+            : "Idea bloqueada: ella y su rama quedan fijas en su lugar",
+        );
+      },
+
       addStroke: (stroke) => {
         const s = get();
         commit({ drawings: [...s.drawings, stroke] });
@@ -603,8 +632,11 @@ export const useMindMap = create<MindMapState>()(
         const dx = position.x - n.x;
         const dy = position.y - n.y;
         if (!dx && !dy) return;
+        const fixed = lockedIds(s.nodes);
+        if (fixed.has(id)) return; // bloqueada: no se arrastra
         const nodes: Nodes = { ...s.nodes };
         for (const d of [id, ...descendantsOf(s.nodes, id)]) {
+          if (fixed.has(d)) continue; // una sub-rama bloqueada no acompaña
           const dn = nodes[d];
           nodes[d] = { ...dn, x: dn.x + dx, y: dn.y + dy };
         }
