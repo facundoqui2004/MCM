@@ -22,6 +22,7 @@ export const mindNodeSchema = z.object({
         .refine((s) => /^data:image\/(webp|jpeg|png);base64,/.test(s), "La imagen tiene que ser webp, jpeg o png"),
       w: z.number().int().min(1).max(4096),
       h: z.number().int().min(1).max(4096),
+      dw: z.number().finite().min(24).max(2000).optional(),
     })
     .optional(),
   floating: z.boolean().optional(),

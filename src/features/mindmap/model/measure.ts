@@ -44,7 +44,24 @@ export const IMG_MAX_H = 170;
 /** margen alrededor de la imagen dentro de la idea */
 export const IMG_PAD = 6;
 
-export function imageBox(img: { w: number; h: number }) {
+/** Límites al ajustar el tamaño a mano (en el lienzo) */
+export const IMG_MIN_SIDE = 64;
+export const IMG_RESIZE_MAX = 720;
+
+/** Ancho permitido para una imagen ajustada a mano: ni invisible ni gigante */
+export function clampImageWidth(img: { w: number; h: number }, width: number) {
+  const ratio = img.w / img.h;
+  const max = Math.min(IMG_RESIZE_MAX, IMG_RESIZE_MAX * ratio);
+  const min = Math.min(max, Math.max(IMG_MIN_SIDE, IMG_MIN_SIDE * ratio));
+  return Math.round(Math.min(max, Math.max(min, width)));
+}
+
+export function imageBox(img: { w: number; h: number; dw?: number }) {
+  if (img.dw) {
+    // tamaño elegido por el usuario: se respeta la proporción de la imagen
+    const width = clampImageWidth(img, img.dw);
+    return { width, height: Math.max(1, Math.round((width * img.h) / img.w)) };
+  }
   const scale = Math.min(1, IMG_MAX_W / img.w, IMG_MAX_H / img.h);
   return { width: Math.max(24, Math.round(img.w * scale)), height: Math.max(24, Math.round(img.h * scale)) };
 }
@@ -98,7 +115,7 @@ function wrap(text: string, t: NodeTypography): { widest: number; lines: number 
  * Tamaño de una idea. Con imagen: la imagen va arriba y el texto debajo
  * (si no hay texto, la idea es sólo la imagen con su margen).
  */
-export function measureNode(text: string, depth: number, image?: { w: number; h: number }, bold = false): NodeSize {
+export function measureNode(text: string, depth: number, image?: { w: number; h: number; dw?: number }, bold = false): NodeSize {
   if (!image) return measureText(text, depth, bold);
   const b = imageBox(image);
   if (!text.trim()) {

@@ -1,12 +1,12 @@
 "use client";
 
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Maximize2, Minus, Lock, NotebookText, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { outwardOf, siblingAxis } from "../model/geometry";
 import { borderFor, inkOn } from "../model/colors";
-import { IMG_PAD, measureNode, typographyOf } from "../model/measure";
+import { clampImageWidth, IMG_PAD, measureNode, typographyOf } from "../model/measure";
 import { useDrawUi } from "../store/draw-ui-store";
 import { NodeFormatBar } from "./node-format-bar";
 import { accentOf } from "../model/palette";
@@ -185,6 +185,10 @@ function MindNodeImpl({ id }: NodeProps) {
   const draft = useMindMap((s) => (s.editingId === id ? s.editDraft : null));
   const drawing = useDrawUi((d) => d.tool !== null);
   const [hover, setHover] = useState(false);
+  // ancho de la imagen mientras se la estira con el tirador (todavía sin guardar)
+  const [liveW, setLiveW] = useState<number | null>(null);
+  const resize = useRef<{ pid: number; x: number; y: number; start: number; zoom: number; width: number } | null>(null);
+  const rf = useReactFlow();
   const wrapRef = useRef<HTMLDivElement>(null);
   // Si la idea se mueve (animación de layout) y deja de estar bajo el cursor, el
   // navegador no avisa "mouseleave": se verifica con el próximo movimiento del mouse.
@@ -207,22 +211,30 @@ function MindNodeImpl({ id }: NodeProps) {
   const t = typographyOf(depth, !!node?.bold);
   const committed = measureNode(node.text, depth, node.image, node.bold);
   // al escribir en una idea con imagen siempre hay lugar para el texto, aunque esté vacío
-  const size = draft === null ? committed : measureNode(node.image && !draft.trim() ? "Mm" : draft, depth, node.image, node.bold);
+  const liveImage = node.image && liveW !== null ? { ...node.image, dw: liveW } : node.image;
+  const size =
+    draft === null
+      ? liveW === null
+        ? committed
+        : measureNode(node.text, depth, liveImage, node.bold)
+      : measureNode(node.image && !draft.trim() ? "Mm" : draft, depth, node.image, node.bold);
   const imgTop = size.image ? size.image.height + IMG_PAD : 0;
   const isFloatingRoot = !!node.floating && !node.parentId;
   // Mientras se edita, el nodo crece alejándose de su padre (y centrado en el eje
   // perpendicular), para no tapar la rama de la que cuelga.
   const dw = size.width - committed.width;
   const dh = size.height - committed.height;
-  const growX = isRoot || mode === "tree" ? -dw / 2 : outward === "left" ? -dw : outward === "right" ? 0 : -dw / 2;
-  const growY = mode === "tree" ? 0 : outward === "top" ? -dh : outward === "bottom" ? 0 : -dh / 2;
-  const showControls = (hover || selected) && !editing && !dragging;
+  // al estirar la imagen la idea crece hacia abajo y a la derecha: el tirador sigue al cursor
+  const resizing = liveW !== null;
+  const growX = resizing ? 0 : isRoot || mode === "tree" ? -dw / 2 : outward === "left" ? -dw : outward === "right" ? 0 : -dw / 2;
+  const growY = resizing ? 0 : mode === "tree" ? 0 : outward === "top" ? -dh : outward === "bottom" ? 0 : -dh / 2;
+  const showControls = (hover || selected) && !editing && !dragging && !resizing;
   const hasChildren = node.children.length > 0;
   const sib = siblingAxis(outward);
   const s = useMindMap.getState;
   const multiline = size.lines > 1;
   const hasNote = !!node.note?.trim();
-  const showConnectors = (hover || selected) && !editing && !dragging && !drawing;
+  const showConnectors = (hover || selected) && !editing && !dragging && !drawing && !resizing;
 
   const tier = isRoot ? "mm-node--root" : depth === 1 ? "mm-node--branch" : "mm-node--leaf";
 
@@ -313,6 +325,62 @@ function MindNodeImpl({ id }: NodeProps) {
                   <X size={12} />
                 </button>
               </div>
+            )}
+            {resizing && (
+              <span className="mm-img-size" aria-hidden>
+                {size.image.width} × {size.image.height}
+              </span>
+            )}
+            {selected && !editing && (
+              <button
+                type="button"
+                className="mm-img-resize nodrag nopan"
+                aria-label="Cambiar el tamaño de la imagen"
+                title="Arrastrá para cambiar el tamaño · doble clic: tamaño automático"
+                onPointerDown={(e) => {
+                  if (e.button !== 0 || !size.image) return;
+                  e.stopPropagation();
+                  e.preventDefault();
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  resize.current = { pid: e.pointerId, x: e.clientX, y: e.clientY, start: size.image.width, zoom: rf.getZoom() || 1, width: size.image.width };
+                }}
+                onPointerMove={(e) => {
+                  const g = resize.current;
+                  if (!g || g.pid !== e.pointerId || !node.image) return;
+                  // el movimiento más largo (horizontal o vertical) manda; se conserva la proporción
+                  const dx = e.clientX - g.x;
+                  const dy = (e.clientY - g.y) * (node.image.w / node.image.h);
+                  const delta = Math.abs(dx) >= Math.abs(dy) ? dx : dy;
+                  if (liveW === null && Math.abs(delta) < 3) return;
+                  g.width = clampImageWidth(node.image, g.start + delta / g.zoom);
+                  setLiveW(g.width);
+                }}
+                onPointerUp={(e) => {
+                  const g = resize.current;
+                  if (!g || g.pid !== e.pointerId) return;
+                  resize.current = null;
+                  if (liveW !== null) s().setImageSize(id, g.width);
+                  setLiveW(null);
+                }}
+                onPointerCancel={() => {
+                  resize.current = null;
+                  setLiveW(null);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  s().setImageSize(id, null);
+                }}
+                onKeyDown={(e) => {
+                  if (!size.image) return;
+                  const step = e.shiftKey ? 40 : 10;
+                  if (e.key === "ArrowRight" || e.key === "ArrowDown") s().setImageSize(id, size.image.width + step);
+                  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") s().setImageSize(id, size.image.width - step);
+                  else return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              />
             )}
           </div>
         )}

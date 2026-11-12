@@ -26,6 +26,8 @@ export interface NodeImage {
   /** tamaño en píxeles de la imagen guardada */
   w: number;
   h: number;
+  /** ancho con el que se muestra en el lienzo, si el usuario lo ajustó a mano */
+  dw?: number;
 }
 
 export interface MindNodeModel {

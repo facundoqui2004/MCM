@@ -71,7 +71,7 @@ Clic en una flecha para elegirla: aparece una barrita para **renombrarla**, **in
 
 Con una idea elegida, botón **Imagen**, `Ctrl V` con una imagen copiada (por ejemplo, una captura de pantalla), o arrastrar un archivo desde la compu y soltarlo sobre la idea. La imagen va arriba y el texto abajo, y una idea puede ser solo una imagen.
 
-Sobre la imagen hay dos botones: **verla en grande** y **quitarla** (`Ctrl Z` la recupera). Las imágenes se achican a 960 px y se comprimen en el navegador (WebP) antes de guardarse dentro del mapa, así que no hace falta ningún servicio extra para archivos.
+Sobre la imagen hay dos botones: **verla en grande** y **quitarla** (`Ctrl Z` la recupera). En la esquina de abajo a la derecha hay un **tirador**: arrastrándolo se agranda o achica la imagen (siempre conserva la proporción) y ese tamaño queda guardado con el mapa. Doble clic en el tirador la devuelve al tamaño automático. Las imágenes se achican a 960 px y se comprimen en el navegador (WebP) antes de guardarse dentro del mapa, así que no hace falta ningún servicio extra para archivos.
 
 ![Una imagen de una idea vista en grande](docs/imagen.jpg)
 
@@ -220,7 +220,7 @@ Cada mapa es un documento JSON validado con Zod: una fila de la base del sitio, 
     "n002": {
       "id": "n002", "parentId": "n001", "text": "Ventana deslizante",
       "note": "# Ventana deslizante\nSe pueden enviar **varias tramas**…",   // nota en Markdown
-      "image": { "src": "data:image/webp;base64,…", "w": 960, "h": 446 }    // imagen comprimida
+      "image": { "src": "data:image/webp;base64,…", "w": 960, "h": 446, "dw": 320 }    // imagen comprimida
     },
     "n020": { "id": "n020", "parentId": null, "floating": true, "text": "Para el parcial", "...": "..." } // idea suelta
   },

@@ -5,7 +5,7 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { createNode } from "../model/factory";
 import { applyPositions, computeLayout } from "../model/layout";
-import { measureNode } from "../model/measure";
+import { clampImageWidth, measureNode } from "../model/measure";
 import { BRANCH_COUNT } from "../model/palette";
 import { depthOf, descendantsOf, floatingRoots, lockedIds, lockOwner, visibleChildren } from "../model/tree";
 import type { Direction, LayoutMode, MindMapDoc, MindNodeModel, NodeImage, Relation, Side, Stroke, XY } from "../model/types";
@@ -89,6 +89,8 @@ export interface MindMapState extends Snapshot {
   addFloating: (pos: XY, opts?: { image?: NodeImage }) => string;
   /** Pone o quita (null) la imagen de una idea */
   setImage: (id: string, image: NodeImage | null) => boolean;
+  /** Fija el ancho con el que se muestra la imagen (null = volver al tamaño automático) */
+  setImageSize: (id: string, width: number | null) => void;
 
   /**
    * Formato de una o varias ideas: color de relleno (null = el del tema),
@@ -526,6 +528,17 @@ export const useMindMap = create<MindMapState>()(
         }
         commit({ nodes: settle({ ...s.nodes, [id]: next }) });
         return true;
+      },
+
+      setImageSize: (id, width) => {
+        const s = get();
+        const n = s.nodes[id];
+        if (!n?.image) return;
+        const image: NodeImage = { ...n.image };
+        if (width === null) delete image.dw;
+        else image.dw = clampImageWidth(image, width);
+        if (image.dw === n.image.dw) return;
+        commit({ nodes: settle({ ...s.nodes, [id]: { ...n, image } }) });
       },
 
       setNodeStyle: (ids, patch) => {
